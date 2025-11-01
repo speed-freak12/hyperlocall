@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   User, Lock, Mail, Book, Search, MessageSquare, Plus, Users, 
   Briefcase, ArrowRight, X, Menu, DollarSign, Repeat, MapPin, UserCheck,
   HelpCircle, Info, ClipboardList, Zap, MessageCircle, UserSearch,
   ChevronDown, Send, Settings, LogOut, Heart, Home, ThumbsUp, MessageSquareReply,
-  Upload, CheckCircle, GraduationCap, Award
+  Upload, CheckCircle, GraduationCap, Award, Calendar, GitPullRequest, 
+  Star, BarChart2, TrendingUp, Gift, MessageCircleHeart, LayoutDashboard,
+  Library, Lightbulb, UserRound, Sparkles
 } from 'lucide-react';
 import { initializeApp, setLogLevel } from 'firebase/app';
 import { 
@@ -28,7 +30,8 @@ import {
   serverTimestamp,
   orderBy,
   getDocs,
-  updateDoc
+  updateDoc,
+  limit
 } from "firebase/firestore";
 import { 
   getStorage, 
@@ -924,10 +927,13 @@ function RadioRole({ id, value, checked, onChange, label, Icon }) {
   );
 }
 
+// --- START OF NEW DASHBOARD ---
+
 function DashboardPage({ navigateTo, user, handleLogout, selectedConversation }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [dashboardPage, setDashboardPage] = useState('overview');
+  // Default to 'overview' to match the new design
+  const [dashboardPage, setDashboardPage] = useState('overview'); 
 
   useEffect(() => {
     if (selectedConversation) {
@@ -974,22 +980,65 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
     
   }, [user]);
 
+  // Helper function to get the title for the header
+  const getPageTitle = (page) => {
+    switch (page) {
+      case 'overview': return 'Dashboard Overview';
+      case 'my-courses': return 'My Courses';
+      case 'skills': return 'My Skills';
+      case 'recommendations': return 'Skill Recommendations';
+      case 'sessions': return 'Upcoming Sessions';
+      case 'requests': return 'Requests & Offers';
+      case 'feed': return 'Community Feed';
+      case 'events': return 'Events';
+      case 'leaderboard': return 'Leaderboard';
+      case 'reviews': return 'Peer Reviews';
+      case 'performance': return 'Performance';
+      case 'earnings': return 'Earnings';
+      case 'messages': return 'Messages';
+      case 'profile': return 'My Profile';
+      case 'settings': return 'Settings';
+      default: return 'Dashboard';
+    }
+  };
+
   const renderDashboardPage = () => {
+    // Pass user and profile to all pages
+    const pageProps = { user, profile, navigateTo, setDashboardPage, db }; // Pass db down
+
     switch (dashboardPage) {
       case 'overview':
-        return <DashboardOverview user={user} profile={profile} navigateTo={navigateTo} setDashboardPage={setDashboardPage} />;
+        return <DashboardOverview {...pageProps} />;
+      case 'my-courses':
+        return <MyCoursesPage {...pageProps} />;
+      case 'skills':
+        return <ManageSkillsTab {...pageProps} />;
+      case 'recommendations':
+        return <SkillRecommendationsPage {...pageProps} />;
+      case 'sessions':
+        return <UpcomingSessionsPage {...pageProps} />;
+      case 'requests':
+        return <RequestsOffersPage {...pageProps} />;
+      case 'feed':
+        return <CommunityPage navigateTo={navigateTo} currentUser={user} isDashboard={true} db={db} />;
+      case 'events':
+        return <EventsPage {...pageProps} />;
+      case 'leaderboard':
+        return <LeaderboardPage {...pageProps} />;
+      case 'reviews':
+        return <PeerReviewsPage {...pageProps} />;
+      case 'performance':
+        return <PerformancePage {...pageProps} />;
+      case 'earnings':
+        return <EarningsPage {...pageProps} />;
       case 'messages':
         return <MessagingTab user={user} navigateTo={navigateTo} initialConvo={selectedConversation} />;
-      case 'community':
-        return <CommunityPage navigateTo={navigateTo} currentUser={user} isDashboard={true} />;
       case 'profile':
         return <ProfileTab profile={profile} user={user} />;
-      case 'skills':
-        return <ManageSkillsTab user={user} profile={profile} />;
-      case 'favorites':
-        return <FavoritesTab navigateTo={navigateTo} user={user} />;
+      case 'settings':
+        return <DashboardSettingsPage {...pageProps} />; // Using a new settings page for dashboard
       default:
-        return <DashboardOverview user={user} profile={profile} navigateTo={navigateTo} setDashboardPage={setDashboardPage} />;
+        return <DashboardOverview {...pageProps} />;
     }
   };
 
@@ -1010,7 +1059,7 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-50 font-sans">
       <DashboardSidebar 
         user={user} 
         handleLogout={handleLogout} 
@@ -1020,14 +1069,21 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
         profile={profile}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <DashboardHeader 
-          user={user} 
-          handleLogout={handleLogout} 
-          navigateTo={navigateTo} 
-          dashboardPage={dashboardPage} 
-        />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6 md:p-10">
-          {renderDashboardPage()}
+        {/* The main content area now includes the header */}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 md:p-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            {getPageTitle(dashboardPage)}
+          </h1>
+          {/* Welcome message only shows on overview */}
+          {dashboardPage === 'overview' && (
+             <h2 className="text-2xl font-normal text-gray-600 mt-2 mb-6">
+              Welcome back, <span className="font-semibold text-indigo-600">{user.displayName}</span>!
+            </h2>
+          )}
+          
+          <div className={dashboardPage === 'overview' ? "mt-0" : "mt-6"}>
+            {renderDashboardPage()}
+          </div>
         </main>
       </div>
     </div>
@@ -1035,52 +1091,87 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
 }
 
 function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDashboardPage, profile }) {
-  const sidebarNav = [
-    { name: 'Overview', page: 'overview', icon: Home },
+  
+  const sidebarNavTop = [
+    { name: 'Dashboard', page: 'overview', icon: LayoutDashboard },
+    { name: 'My Courses', page: 'my-courses', icon: Library },
+    { name: 'Skill Recommendations', page: 'recommendations', icon: Lightbulb },
+    { name: 'Upcoming Sessions', page: 'sessions', icon: Calendar },
+    { name: 'Requests & Offers', page: 'requests', icon: GitPullRequest },
+    { name: 'Community Feed', page: 'feed', icon: Users },
+    { name: 'Events', page: 'events', icon: Gift },
+    { name: 'Leaderboard', page: 'leaderboard', icon: Award },
+    { name: 'Peer Reviews', page: 'reviews', icon: Star },
+    { name: 'Performance', page: 'performance', icon: BarChart2 },
+    { name: 'Earnings', page: 'earnings', icon: DollarSign },
+    // --- THIS IS THE FIX ---
     { name: 'Messages', page: 'messages', icon: MessageSquare },
-    { name: 'Community', page: 'community', icon: Users },
-    { name: 'Profile', page: 'profile', icon: User },
-    { name: 'Favorites', page: 'favorites', icon: Heart },
+    // --- END OF FIX ---
+  ];
+
+  const sidebarNavBottom = [
+    { name: 'Settings', page: 'settings', icon: Settings },
+    { name: 'My Profile', page: 'profile', icon: UserRound }
   ];
   
+  // Add 'My Skills' for teachers
   if (profile?.role === 'teacher') {
-    sidebarNav.push({ name: 'Add/Manage Skills', page: 'skills', icon: Plus });
+    sidebarNavTop.splice(2, 0, { name: 'My Skills', page: 'skills', icon: Briefcase });
   }
 
   return (
     <div className="hidden md:flex md:flex-col md:w-64 bg-white border-r border-gray-200">
-      <div className="flex flex-col flex-grow pt-5">
-        <div className="flex items-center flex-shrink-0 px-4">
-          <button onClick={() => navigateTo('home')} className="flex items-center text-2xl font-bold text-indigo-600 focus:outline-none">
-            <Users className="h-7 w-7 mr-2" />
+      <div className="flex flex-col flex-grow">
+        {/* Header */}
+        <div className="flex items-center h-20 px-4">
+          <button onClick={() => navigateTo('home')} className="flex items-center text-2xl font-bold text-gray-900 focus:outline-none">
+            <Sparkles className="h-7 w-7 mr-2 text-indigo-600" />
             Hyperlocal
           </button>
         </div>
-        <p className="text-sm text-gray-500 px-4 mt-1">Skill Sharing Platform</p>
-        <div className="mt-8 flex-1 flex flex-col">
-          <nav className="flex-1 px-2 space-y-2">
-            {sidebarNav.map((item) => (
+        <p className="text-sm text-gray-500 px-4 -mt-4 mb-4">Skill Sharing Platform</p>
+
+        {/* Navigation */}
+        <div className="flex-1 flex flex-col overflow-y-auto">
+          <nav className="flex-1 px-2 py-2 space-y-1">
+            {sidebarNavTop.map((item) => (
               <button
                 key={item.name}
                 onClick={() => setDashboardPage(item.page)}
-                className={`flex items-center px-3 py-3 text-lg font-medium rounded-md w-full ${
+                className={`flex items-center px-3 py-3 text-sm font-medium rounded-md w-full ${
                   dashboardPage === item.page
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
-                <item.icon className="mr-3 h-6 w-6" />
+                <item.icon className="mr-3 h-5 w-5" />
                 {item.name}
               </button>
             ))}
           </nav>
         </div>
-        <div className="border-t border-gray-200 p-4">
+        
+        {/* Bottom Nav */}
+        <div className="border-t border-gray-200 p-2 space-y-1">
+          {sidebarNavBottom.map((item) => (
+              <button
+                key={item.name}
+                onClick={() => setDashboardPage(item.page)}
+                className={`flex items-center px-3 py-3 text-sm font-medium rounded-md w-full ${
+                  dashboardPage === item.page
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                <item.icon className="mr-3 h-5 w-5" />
+                {item.name}
+              </button>
+            ))}
           <button
             onClick={handleLogout}
-            className="flex items-center px-3 py-3 text-lg font-medium rounded-md w-full text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            className="flex items-center px-3 py-3 text-sm font-medium rounded-md w-full text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           >
-            <LogOut className="mr-3 h-6 w-6" />
+            <LogOut className="mr-3 h-5 w-5" />
             Logout
           </button>
         </div>
@@ -1089,126 +1180,408 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
   );
 }
 
-function DashboardHeader({ user, handleLogout, navigateTo, dashboardPage }) {
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  
-  const getTitle = () => {
-    switch (dashboardPage) {
-      case 'overview': return 'Dashboard Overview';
-      case 'messages': return 'Messages';
-      case 'community': return 'Community';
-      case 'profile': return 'Edit Profile';
-      case 'skills': return 'Add/Manage Skills';
-      case 'favorites': return 'My Favorites';
-      default: return 'Dashboard';
-    }
-  };
 
-  return (
-    <header className="w-full bg-white shadow-sm border-b border-gray-200">
-      <div className="relative flex-shrink-0 flex h-20 px-4 md:px-8 justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">{getTitle()}</h1>
-        
-        <div className="relative">
-          <button
-            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            onBlur={() => setTimeout(() => setIsUserMenuOpen(false), 200)}
-            className="flex items-center justify-center h-12 w-12 bg-yellow-400 text-gray-900 rounded-full font-semibold text-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            {user.photoURL ? (
-              <img src={user.photoURL} alt="Profile" className="h-12 w-12 rounded-full object-cover" />
-            ) : (
-              user.displayName ? user.displayName.split(' ').map(n => n[0]).join('').toUpperCase() : <User className="h-6 w-6" />
-            )}
-          </button>
-          {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-50 overflow-hidden border border-gray-100">
-              <div className="px-4 py-3 border-b border-gray-200">
-                <p className="text-lg font-medium text-gray-900 truncate">{user.displayName}</p>
-                <p className="text-base text-gray-500 truncate">{user.email}</p>
-              </div>
-              <div className="py-1">
-                <button
-                  onClick={() => { navigateTo('browse'); setIsUserMenuOpen(false); }}
-                  className="flex items-center w-full text-left px-4 py-3 text-lg text-gray-700 hover:bg-gray-100 transition duration-150"
-                >
-                  <Search className="h-5 w-5 mr-3" /> Browse Skills
-                </button>
-                <button
-                  onClick={() => { navigateTo('settings'); setIsUserMenuOpen(false); }}
-                  className="flex items-center w-full text-left px-4 py-3 text-lg text-gray-700 hover:bg-gray-100 transition duration-150"
-                >
-                  <Settings className="h-5 w-5 mr-3" /> Settings
-                </button>
-              </div>
-              <div className="border-t border-gray-200 py-1">
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center w-full text-left px-4 py-3 text-lg text-gray-700 hover:bg-gray-100 transition duration-150"
-                >
-                  <LogOut className="h-5 w-5 mr-3" /> Log Out
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function DashboardOverview({ user, profile, navigateTo, setDashboardPage }) {
+// --- NEW DASHBOARD OVERVIEW (WITH LIVE DATA) ---
+function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) {
   const stats = [
     { name: 'Skills Learning', value: 3, icon: GraduationCap },
     { name: 'Skills Teaching', value: 2, icon: Briefcase },
     { name: 'Community Points', value: 150, icon: Award },
   ];
 
+  // --- START OF DATA FETCHING ---
+  const [myCourses, setMyCourses] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  
+  const [upcomingSessions, setUpcomingSessions] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+
+  const [communityFeed, setCommunityFeed] = useState([]);
+  const [loadingFeed, setLoadingFeed] = useState(true);
+
+  useEffect(() => {
+    if (!user || !db) return;
+
+    // Fetch "My Courses" (skills user is enrolled in)
+    // Assumes an 'enrollments' collection exists
+    const coursesQuery = query(
+      collection(db, "enrollments"), 
+      where("studentId", "==", user.uid), 
+      orderBy("enrolledAt", "desc"), 
+      limit(2)
+    );
+    const unsubCourses = onSnapshot(coursesQuery, (snapshot) => {
+      const courses = [];
+      snapshot.forEach(doc => courses.push({ id: doc.id, ...doc.data() }));
+      setMyCourses(courses);
+      setLoadingCourses(false);
+    }, (err) => {
+      console.error("Error fetching courses: ", err);
+      setLoadingCourses(false);
+    });
+
+    // Fetch "Upcoming Sessions"
+    // Assumes a 'sessions' collection exists
+    const sessionsQuery = query(
+      collection(db, "sessions"), 
+      where("participants", "array-contains", user.uid), 
+      where("sessionDate", ">", new Date()), // Only get future sessions
+      orderBy("sessionDate", "asc"), 
+      limit(2)
+    );
+    const unsubSessions = onSnapshot(sessionsQuery, (snapshot) => {
+      const sessions = [];
+      snapshot.forEach(doc => sessions.push({ id: doc.id, ...doc.data() }));
+      setUpcomingSessions(sessions);
+      setLoadingSessions(false);
+    }, (err) => {
+      console.error("Error fetching sessions: ", err);
+      setLoadingSessions(false);
+    });
+
+    // Fetch "Community Feed"
+    // Assumes a 'posts' collection exists, as used in CommunityPage
+    const feedQuery = query(
+      collection(db, "posts"), 
+      orderBy("createdAt", "desc"), 
+      limit(2)
+    );
+    const unsubFeed = onSnapshot(feedQuery, (snapshot) => {
+      const posts = [];
+      snapshot.forEach(doc => posts.push({ id: doc.id, ...doc.data() }));
+      setCommunityFeed(posts);
+      setLoadingFeed(false);
+    }, (err) => {
+      console.error("Error fetching feed: ", err);
+      setLoadingFeed(false);
+    });
+
+    // Unsubscribe listeners on cleanup
+    return () => {
+      unsubCourses();
+      unsubSessions();
+      unsubFeed();
+    };
+
+  }, [user, db]); // Add db to dependency array
+  // --- END OF DATA FETCHING ---
+
   return (
-    <div>
-      <h2 className="text-2xl font-semibold text-gray-700 mb-6">
-        Welcome back, {user.displayName}! Ready to learn and share skills?
-      </h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat) => (
-          <div key={stat.name} className="bg-white p-6 rounded-lg shadow-lg flex items-center">
+          <div 
+            key={stat.name} 
+            className="bg-white p-5 rounded-lg shadow flex items-center"
+          >
             <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
-              <stat.icon className="h-8 w-8" />
+              <stat.icon className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-lg text-gray-500">{stat.name}</p>
+              <p className="text-sm font-medium text-gray-500">{stat.name}</p>
               <p className="text-4xl font-bold text-gray-900">{stat.value}</p>
             </div>
           </div>
         ))}
       </div>
 
+      {/* Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-yellow-400 p-8 rounded-lg shadow-lg text-gray-900">
-          <h3 className="text-3xl font-bold mb-3">Find Skills to Learn</h3>
-          <p className="text-lg mb-6">Discover new skills in your neighborhood.</p>
+        <div className="relative bg-blue-500 p-6 rounded-lg shadow-lg text-white">
+          <h3 className="flex items-center text-2xl font-bold mb-2">
+            <Search className="h-6 w-6 mr-2" />
+            Find Skills to Learn
+          </h3>
+          <p className="text-base mb-4 text-blue-100">
+            Discover new skills in your neighborhood.
+          </p>
           <button 
             onClick={() => navigateTo('browse')}
-            className="bg-gray-900 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-gray-700 transition"
+            className="bg-white text-blue-700 font-semibold px-5 py-2 rounded-lg text-base hover:bg-gray-100 transition-colors shadow"
           >
             Explore Skills
           </button>
         </div>
-        <div className="bg-gray-900 p-8 rounded-lg shadow-lg text-white">
-          <h3 className="text-3xl font-bold mb-3">Share Your Skills</h3>
-          <p className="text-lg mb-6">Teach others what you know.</p>
+        
+        <div className="relative bg-amber-500 p-6 rounded-lg shadow-lg text-white">
+          <h3 className="flex items-center text-2xl font-bold mb-2">
+            <Briefcase className="h-6 w-6 mr-2" />
+            Share Your Skills
+          </h3>
+          <p className="text-base mb-4 text-amber-100">
+            Teach others what you know.
+          </p>
           <button 
             onClick={() => setDashboardPage('skills')}
-            className="bg-yellow-400 text-gray-900 px-6 py-3 rounded-lg text-lg font-medium hover:bg-yellow-300 transition"
+            className="bg-white text-amber-700 font-semibold px-5 py-2 rounded-lg text-base hover:bg-gray-100 transition-colors shadow"
           >
             Start Teaching
           </button>
         </div>
       </div>
+
+      {/* New Widgets Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* My Courses / Community Feed Column */}
+        <div className="lg:col-span-1 space-y-6">
+          
+          {/* My Courses */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">My Courses</h3>
+            {loadingCourses ? (
+              <p className="text-gray-500 text-sm">Loading courses...</p>
+            ) : myCourses.length > 0 ? (
+              <div className="space-y-4">
+                {myCourses.map((course) => (
+                  <div key={course.id} className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-gray-100 rounded-full mr-3">
+                        <Book className="h-5 w-5 text-gray-600" />
+                      </div>
+                      <span className="font-medium text-gray-700">{course.skillName || 'Course'}</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-500">{course.progress || '0/5'}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No courses yet. Start learning!</p>
+            )}
+          </div>
+
+          {/* Community Feed */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Community Feed</h3>
+            {loadingFeed ? (
+               <p className="text-gray-500 text-sm">Loading feed...</p>
+            ) : communityFeed.length > 0 ? (
+              <div className="space-y-4">
+                {communityFeed.map((post) => (
+                  <div key={post.id} className="flex">
+                    <div className="flex-shrink-0 h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-bold">
+                      {post.authorName ? post.authorName.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-gray-700 leading-snug">
+                        <span className="font-bold">{post.authorName || 'User'}</span>{' '}
+                        {/* Truncate long content */}
+                        {post.content?.length > 50 ? post.content.substring(0, 50) + '...' : post.content}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No community posts yet.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Upcoming Sessions / Performance Column */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* Upcoming Sessions */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Upcoming Sessions</h3>
+            {loadingSessions ? (
+              <p className="text-gray-500 text-sm">Loading sessions...</p>
+            ) : upcomingSessions.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingSessions.map((session) => (
+                  <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-gray-800">{session.title || 'Session'}</p>
+                      <p className="text-sm text-gray-500">
+                        {session.sessionDate ? new Date(session.sessionDate.seconds * 1000).toLocaleString() : 'Date TBD'}
+                      </p>
+                    </div>
+                    <button className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                      View
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No upcoming sessions.</p>
+            )}
+          </div>
+
+          {/* Performance */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Performance</h3>
+            <div className="h-48 flex items-center justify-center">
+              {/* This is a simple SVG placeholder for the graph */}
+              <svg width="100%" height="100%" viewBox="0 0 300 100" preserveAspectRatio="none">
+                <path d="M 0 50 L 50 60 L 100 40 L 150 70 L 200 60 L 250 80 L 300 70" fill="none" stroke="#818cf8" strokeWidth="2" />
+                <path d="M 0 50 L 50 60 L 100 40 L 150 70 L 200 60 L 250 80 L 300 70" fill="#c7d2fe" fillOpacity="0.3" stroke="none" />
+                <circle cx="50" cy="60" r="3" fill="#4f46e5" />
+                <circle cx="100" cy="40" r="3" fill="#4f46e5" />
+                <circle cx="150" cy="70" r="3" fill="#4f46e5" />
+                <circle cx="200" cy="60" r="3" fill="#4f46e5" />
+                <circle cx="250" cy="80" r="3" fill="#4f46e5" />
+                <circle cx="300" cy="70" r="3" fill="#4f46e5" />
+              </svg>
+            </div>
+            <div className="flex justify-between text-sm text-gray-500 mt-2">
+              <span>M</span><span>T</span><span>W</span><span>Th</span><span>F</span><span>Sa</span><span>Su</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }
+// --- END OF NEW DASHBOARD OVERVIEW ---
+
+// --- START OF NEW DASHBOARD PAGES ---
+
+// Generic placeholder component
+function DashboardPlaceholderPage({ title, icon: Icon }) {
+  return (
+    <div className="bg-white p-6 rounded-lg shadow text-center">
+      <Icon className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
+      <p className="text-lg text-gray-600">
+        This feature is coming soon! This is where you will manage your {title.toLowerCase()}.
+      </p>
+    </div>
+  );
+}
+
+function MyCoursesPage({ user, profile }) {
+  // You can fetch and display the user's "learner" courses here
+  return <DashboardPlaceholderPage title="My Courses" icon={Library} />;
+}
+
+function SkillRecommendationsPage({ user, profile }) {
+  // You can add logic for recommendations here
+  return <DashboardPlaceholderPage title="Skill Recommendations" icon={Lightbulb} />;
+}
+
+// --- NEW LIVE UPCOMING SESSIONS PAGE ---
+function UpcomingSessionsPage({ user, profile, db }) {
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user || !db) return;
+    setLoading(true);
+
+    const sessionsQuery = query(
+      collection(db, "sessions"), 
+      where("participants", "array-contains", user.uid), 
+      where("sessionDate", ">", new Date()), // Only get future sessions
+      orderBy("sessionDate", "asc")
+    );
+    
+    const unsubscribe = onSnapshot(sessionsQuery, (snapshot) => {
+      const fetchedSessions = [];
+      snapshot.forEach(doc => {
+        fetchedSessions.push({ id: doc.id, ...doc.data() });
+      });
+      setSessions(fetchedSessions);
+      setLoading(false);
+    }, (err) => {
+      console.error("Error fetching sessions: ", err);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, db]);
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Upcoming Sessions</h2>
+      {loading ? (
+        <p className="text-gray-500">Loading sessions...</p>
+      ) : sessions.length === 0 ? (
+        <p className="text-gray-500 text-lg text-center p-8">You have no upcoming sessions scheduled.</p>
+      ) : (
+        <div className="space-y-4">
+          {sessions.map((session) => (
+            <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div>
+                <p className="font-bold text-lg text-gray-800">{session.title || 'Session'}</p>
+                <p className="text-sm text-gray-600">
+                  {session.sessionDate ? new Date(session.sessionDate.seconds * 1000).toLocaleString() : 'Date TBD'}
+                </p>
+                {/* We'd need to fetch the other participant's name, but this is a good start */}
+                <p className="text-sm text-gray-500">With: {session.teacherName || 'Teacher'}</p> 
+              </div>
+              <button className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                View Details
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RequestsOffersPage({ user, profile }) {
+  // You can show lists of requests and offers here
+  return <DashboardPlaceholderPage title="Requests & Offers" icon={GitPullRequest} />;
+}
+
+function EventsPage({ user, profile }) {
+  // You can show a local events calendar here
+  return <DashboardPlaceholderPage title="Events" icon={Gift} />;
+}
+
+function LeaderboardPage({ user, profile }) {
+  // You can fetch and rank users by points here
+  return <DashboardPlaceholderPage title="Leaderboard" icon={Award} />;
+}
+
+function PeerReviewsPage({ user, profile }) {
+  // You can show a list of reviews for the user here
+  return <DashboardPlaceholderPage title="Peer Reviews" icon={Star} />;
+}
+
+function PerformancePage({ user, profile }) {
+  // You can build out charts and stats here
+  return <DashboardPlaceholderPage title="Performance" icon={BarChart2} />;
+}
+
+function EarningsPage({ user, profile }) {
+  // You can show transaction history or skill exchange history here
+  return <DashboardPlaceholderPage title="Earnings" icon={DollarSign} />;
+}
+
+// A new settings page, separate from the public profile editor
+function DashboardSettingsPage({ user, profile, handleLogout }) {
+  // This can be expanded with more settings like notifications, password change, etc.
+  return (
+    <div className="bg-white p-6 rounded-lg shadow max-w-lg">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Settings</h2>
+      <div className="space-y-4">
+        <div className="p-4 border rounded-lg">
+          <h3 className="font-medium text-lg">Account</h3>
+          <p className="text-gray-600">Email: {user.email}</p>
+          <button className="text-sm text-indigo-600 hover:underline mt-1">Change Password (Coming Soon)</button>
+        </div>
+        <div className="p-4 border rounded-lg">
+          <h3 className="font-medium text-lg">Notifications</h3>
+          <p className="text-gray-600">Manage your notification preferences (Coming Soon).</p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="w-full max-w-xs flex items-center justify-center bg-red-100 text-red-700 px-6 py-3 rounded-lg text-lg font-medium hover:bg-red-200 transition duration-150 ease-in-out"
+        >
+          <LogOut className="h-6 w-6 mr-2" />
+          Log Out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- END OF NEW DASHBOARD PAGES ---
+
 
 function ProfileTab({ profile, user }) {
   const [name, setName] = useState(profile.name);
@@ -1418,6 +1791,7 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef(null); // Ref for auto-scrolling
 
   useEffect(() => {
     setLoading(true);
@@ -1436,7 +1810,16 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
       setLoading(false);
       
       if (initialConvo && !convos.find(c => c.id === initialConvo.id)) {
-        setSelectedConvo(initialConvo);
+        // If the initialConvo is not in the list, fetch it directly
+        const fetchConvo = async () => {
+          const convoDoc = await getDoc(doc(db, "conversations", initialConvo.id));
+          if (convoDoc.exists()) {
+            const convoData = { id: convoDoc.id, ...convoDoc.data() };
+            setConversations(prev => [convoData, ...prev]);
+            setSelectedConvo(convoData);
+          }
+        }
+        fetchConvo();
       }
     });
 
@@ -1464,6 +1847,11 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
 
     return () => unsubscribe();
   }, [selectedConvo]);
+  
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -1495,8 +1883,8 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-200px)] border border-gray-300 rounded-lg shadow-lg overflow-hidden bg-white">
-      <div className="w-full md:w-1/3 border-r border-gray-300 bg-white overflow-y-auto">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-150px)] border border-gray-200 rounded-lg shadow-lg overflow-hidden bg-white">
+      <div className="w-full md:w-1/3 border-r border-gray-200 bg-white overflow-y-auto">
         {loading ? (
           <p className="p-4">Loading conversations...</p>
         ) : conversations.length === 0 ? (
@@ -1522,7 +1910,7 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
           </div>
         ) : (
           <>
-            <div className="p-4 border-b border-gray-300 bg-gray-50">
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
               <h2 className="text-xl font-bold">{getOtherParticipantName(selectedConvo)}</h2>
             </div>
             
@@ -1541,9 +1929,10 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
                   </div>
                 </div>
               ))}
+              <div ref={messagesEndRef} />
             </div>
             
-            <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-300 bg-gray-50">
+            <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-gray-50">
               <div className="flex space-x-3">
                 <input
                   type="text"
@@ -1752,82 +2141,50 @@ function ContactUsPage() {
   );
 }
 
-function CommunityPage({ navigateTo, currentUser, isDashboard = false }) {
+// --- NEW COMMUNITY PAGE (LIVE DATA) ---
+function CommunityPage({ navigateTo, currentUser, isDashboard = false, db }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newPost, setNewPost] = useState("");
-  const [newComment, setNewComment] = useState({});
 
   useEffect(() => {
+    if (!db) return;
     setLoading(true);
-    setTimeout(() => {
-      setPosts([
-        {
-          id: 'post1',
-          authorName: 'Jane Doe',
-          authorRole: 'Learner',
-          timestamp: '2 hours ago',
-          content: 'Just had my first guitar lesson with David L.! He was so patient and I already learned 3 chords. Can\'t wait for the next one!',
-          likes: 5,
-          comments: [
-            { id: 'c1', authorName: 'David L.', content: 'You did great, Jane! Keep practicing!', timestamp: '1 hour ago' },
-            { id: 'c2', authorName: 'Sarah K.', content: 'That\'s awesome! I\'ve been thinking of learning guitar too.', timestamp: '30 mins ago' },
-          ]
-        },
-        {
-          id: 'post2',
-          authorName: 'Mike P.',
-          authorRole: 'Teacher',
-          timestamp: '1 day ago',
-          content: 'I have an opening for one more student for my "Intro to Python" skill session this weekend. We\'ll cover basics, variables, and loops. Message me if you\'re interested!',
-          likes: 12,
-          comments: []
-        }
-      ]);
-      setLoading(false);
-    }, 1000);
-  }, []);
-
-  const handlePostSubmit = (e) => {
-    e.preventDefault();
-    if (!newPost.trim()) return;
-    console.log("New post:", newPost);
-    const post = {
-      id: `post${posts.length + 1}`,
-      authorName: currentUser?.displayName || "Anonymous",
-      authorRole: "Learner",
-      timestamp: "Just now",
-      content: newPost,
-      likes: 0,
-      comments: []
-    };
-    setPosts([post, ...posts]);
-    setNewPost("");
-  };
-
-  const handleCommentSubmit = (e, postId) => {
-    e.preventDefault();
-    const commentText = newComment[postId];
-    if (!commentText || !commentText.trim()) return;
-    console.log("New comment for", postId, ":", commentText);
+    // Fetch posts from Firestore
+    const postsQuery = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     
-    const comment = {
-      id: `c${Math.random()}`,
-      authorName: currentUser?.displayName || "Anonymous",
-      content: commentText,
-      timestamp: "Just now"
-    };
-    setPosts(posts.map(p => 
-      p.id === postId ? { ...p, comments: [...p.comments, comment] } : p
-    ));
-    setNewComment(prev => ({ ...prev, [postId]: '' }));
-  };
+    const unsubscribe = onSnapshot(postsQuery, (snapshot) => {
+      const fetchedPosts = [];
+      snapshot.forEach(doc => {
+        fetchedPosts.push({ id: doc.id, ...doc.data() });
+      });
+      setPosts(fetchedPosts);
+      setLoading(false);
+    }, (err) => {
+      console.error("Error fetching posts: ", err);
+      setLoading(false);
+    });
 
-  const handleCommentChange = (postId, text) => {
-    setNewComment(prev => ({
-      ...prev,
-      [postId]: text
-    }));
+    return () => unsubscribe();
+  }, [db]); // Depend on db
+
+  const handlePostSubmit = async (e) => {
+    e.preventDefault();
+    if (!newPost.trim() || !currentUser || !db) return;
+    
+    try {
+      await addDoc(collection(db, "posts"), {
+        content: newPost,
+        authorName: currentUser.displayName || "Anonymous",
+        authorId: currentUser.uid,
+        authorRole: "Learner", // TODO: fetch this from user profile
+        createdAt: serverTimestamp(),
+        likes: 0,
+      });
+      setNewPost("");
+    } catch (error) {
+      console.error("Error adding post: ", error);
+    }
   };
 
   const Wrapper = isDashboard ? 'div' : 'section';
@@ -1866,66 +2223,12 @@ function CommunityPage({ navigateTo, currentUser, isDashboard = false }) {
 
         {loading ? (
           <p className="text-center text-lg">Loading posts...</p>
+        ) : posts.length === 0 ? (
+          <p className="text-center text-lg text-gray-600">No community posts yet. Be the first!</p>
         ) : (
           <div className="space-y-8">
             {posts.map(post => (
-              <div key={post.id} className="bg-white p-6 rounded-lg shadow-lg">
-                <div className="flex items-center mb-4">
-                  <div className="flex-shrink-0 h-12 w-12 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold">
-                    {post.authorName.split(' ').map(n => n[0]).join('').toUpperCase()}
-                  </div>
-                  <div className="ml-4">
-                    <h4 className="text-xl font-bold text-gray-900">{post.authorName}</h4>
-                    <p className="text-sm text-gray-500">{post.authorRole} • {post.timestamp}</p>
-                  </div>
-                </div>
-                
-                <p className="text-lg text-gray-800 mb-4">{post.content}</p>
-                
-                <div className="flex items-center space-x-4 border-b border-t border-gray-200 py-3">
-                  <button className="flex items-center text-gray-600 hover:text-indigo-600">
-                    <ThumbsUp className="h-5 w-5 mr-2" /> {post.likes} Likes
-                  </button>
-                  <div className="flex items-center text-gray-600">
-                    <MessageSquareReply className="h-5 w-5 mr-2" /> {post.comments.length} Comments
-                  </div>
-                </div>
-                
-                <div className="mt-4 space-y-4">
-                  {post.comments.map(comment => (
-                    <div key={comment.id} className="flex">
-                      <div className="flex-shrink-0 h-9 w-9 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-bold text-sm">
-                        {comment.authorName.split(' ').map(n => n[0]).join('').toUpperCase()}
-                      </div>
-                      <div className="ml-3 bg-gray-100 p-3 rounded-lg flex-1">
-                        <p className="text-base">
-                          <span className="font-bold text-gray-900">{comment.authorName}</span>{' '}
-                          {comment.content}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">{comment.timestamp}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {currentUser && (
-                  <form onSubmit={(e) => handleCommentSubmit(e, post.id)} className="mt-4 flex space-x-3">
-                    <input
-                      type="text"
-                      value={newComment[post.id] || ''}
-                      onChange={(e) => handleCommentChange(post.id, e.target.value)}
-                      placeholder="Write a comment..."
-                      className="flex-grow text-base p-2 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-indigo-500"
-                    />
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
-                    >
-                      Reply
-                    </button>
-                  </form>
-                )}
-              </div>
+              <PostItem key={post.id} post={post} currentUser={currentUser} db={db} />
             ))}
           </div>
         )}
@@ -1933,6 +2236,122 @@ function CommunityPage({ navigateTo, currentUser, isDashboard = false }) {
     </Wrapper>
   );
 }
+
+// --- NEW SUB-COMPONENT FOR LIVE COMMENTS ---
+function PostItem({ post, currentUser, db }) {
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [loadingComments, setLoadingComments] = useState(true);
+
+  useEffect(() => {
+    if (!db) return;
+    setLoadingComments(true);
+    const commentsQuery = query(
+      collection(db, "posts", post.id, "comments"),
+      orderBy("createdAt", "asc")
+    );
+
+    const unsubscribe = onSnapshot(commentsQuery, (snapshot) => {
+      const fetchedComments = [];
+      snapshot.forEach(doc => {
+        fetchedComments.push({ id: doc.id, ...doc.data() });
+      });
+      setComments(fetchedComments);
+      setLoadingComments(false);
+    }, (err) => {
+      console.error("Error fetching comments: ", err);
+      setLoadingComments(false);
+    });
+
+    return () => unsubscribe();
+  }, [db, post.id]);
+
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim() || !currentUser || !db) return;
+
+    try {
+      await addDoc(collection(db, "posts", post.id, "comments"), {
+        content: newComment,
+        authorName: currentUser.displayName || "Anonymous",
+        authorId: currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+      setNewComment("");
+    } catch (error) {
+      console.error("Error adding comment: ", error);
+    }
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-lg">
+      <div className="flex items-center mb-4">
+        <div className="flex-shrink-0 h-12 w-12 bg-indigo-200 rounded-full flex items-center justify-center text-indigo-700 font-bold">
+          {post.authorName.split(' ').map(n => n[0]).join('').toUpperCase()}
+        </div>
+        <div className="ml-4">
+          <h4 className="text-xl font-bold text-gray-900">{post.authorName}</h4>
+          <p className="text-sm text-gray-500">
+            {post.authorRole} • {post.createdAt ? new Date(post.createdAt.seconds * 1000).toLocaleString() : 'Just now'}
+          </p>
+        </div>
+      </div>
+      
+      <p className="text-lg text-gray-800 mb-4">{post.content}</p>
+      
+      <div className="flex items-center space-x-4 border-b border-t border-gray-200 py-3">
+        <button className="flex items-center text-gray-600 hover:text-indigo-600">
+          <ThumbsUp className="h-5 w-5 mr-2" /> {post.likes || 0} Likes
+        </button>
+        <div className="flex items-center text-gray-600">
+          <MessageSquareReply className="h-5 w-5 mr-2" /> {comments.length} Comments
+        </div>
+      </div>
+      
+      <div className="mt-4 space-y-4">
+        {loadingComments ? (
+          <p className="text-sm text-gray-500">Loading comments...</p>
+        ) : (
+          comments.map(comment => (
+            <div key={comment.id} className="flex">
+              <div className="flex-shrink-0 h-9 w-9 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-bold text-sm">
+                {comment.authorName.split(' ').map(n => n[0]).join('').toUpperCase()}
+              </div>
+              <div className="ml-3 bg-gray-100 p-3 rounded-lg flex-1">
+                <p className="text-base">
+                  <span className="font-bold text-gray-900">{comment.authorName}</span>{' '}
+                  {comment.content}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {comment.createdAt ? new Date(comment.createdAt.seconds * 1000).toLocaleString() : 'Just now'}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {currentUser && (
+        <form onSubmit={handleCommentSubmit} className="mt-4 flex space-x-3">
+          <input
+            type="text"
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Write a comment..."
+            className="flex-grow text-base p-2 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-indigo-500"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
+          >
+            Reply
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 
 function MyFavoritesPage({ navigateTo, currentUser }) {
   return (
@@ -2134,3 +2553,4 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
     </section>
   );
 }
+
