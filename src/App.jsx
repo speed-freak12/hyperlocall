@@ -39,9 +39,9 @@ import {
 
 const firebaseConfig = {
   apiKey: "AIzaSyDty5os84VgLNRZTDAHErleYUOc9zBnaa0",
-  authDomain: "hyperlocal1.firebaseapp.com",
-  projectId: "hyperlocal1",
-  storageBucket: "hyperlocal1.appspot.com",
+  authDomain: "hyperlocall.firebaseapp.com",
+  projectId: "hyperlocall",
+  storageBucket: "hyperlocall.appspot.com",
   messagingSenderId: "43216293091",
   appId: "1:43216293091:web:8b4b2de5dbd428e2f389d6",
   measurementId: "G-13PVX571LT"
@@ -723,7 +723,13 @@ function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
     <section className="py-24 bg-white">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-center sm:items-start">
-          <User className="h-32 w-32 bg-gray-200 text-gray-500 p-4 rounded-full" />
+          {teacher.photoURL ? (
+            <img src={teacher.photoURL} alt="Profile" className="h-32 w-32 rounded-full object-cover shadow-md" />
+          ) : (
+            <div className="h-32 w-32 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+              <User className="h-16 w-16" />
+            </div>
+          )}
           <div className="sm:ml-8 mt-6 sm:mt-0 text-center sm:text-left">
             <h1 className="text-5xl font-extrabold text-gray-900">{teacher.name}</h1>
             <div className="flex items-center justify-center sm:justify-start mt-4 text-lg text-gray-600">
@@ -1966,19 +1972,24 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
     }
     setLoading(true);
     const fetchProfile = async () => {
-      const docRef = doc(db, "users", currentUser.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setProfile(data);
-        setName(data.name);
-        setBio(data.bio);
-        setLocation(data.location);
-        setPreview(data.photoURL || null);
-      } else {
-        console.error("No profile found for settings page!");
+      try {
+        const docRef = doc(db, "users", currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setProfile(data);
+          setName(data.name || currentUser.displayName || "");
+          setBio(data.bio || "");
+          setLocation(data.location || "");
+          setPreview(data.photoURL || null);
+        } else {
+          console.error("No profile found for settings page!");
+        }
+      } catch (error) {
+        console.error("Error fetching profile for settings:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchProfile();
   }, [currentUser]);
@@ -1993,7 +2004,7 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!currentUser) return;
+    if (!currentUser || !profile) return;
 
     setIsUploading(true);
     setMessage('Updating profile...');
@@ -2050,7 +2061,7 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
         <div className="bg-white rounded-lg shadow-lg overflow-hidden divide-y divide-gray-200">
           <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="md:col-span-1 flex flex-col items-center">
-              <label htmlFor="profile-pic" className="cursor-pointer">
+              <label htmlFor="profile-pic-settings" className="cursor-pointer">
                 <span className="text-lg font-medium text-gray-900 mb-2 block text-center">Profile Picture</span>
                 {preview ? (
                   <img src={preview} alt="Profile" className="h-40 w-40 rounded-full object-cover shadow-md" />
@@ -2065,7 +2076,7 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
                 </span>
               </label>
               <input
-                id="profile-pic"
+                id="profile-pic-settings"
                 type="file"
                 accept="image/*"
                 className="sr-only"
@@ -2075,9 +2086,9 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
             
             <div className="md:col-span-2 space-y-6">
               <h3 className="text-2xl font-bold text-gray-900">My Profile</h3>
-              <FormInput id="profileName" type="text" value={name} onChange={setName} placeholder="Your Full Name" Icon={User} />
-              <FormInput id="profileLocation" type="text" value={location} onChange={setLocation} placeholder="Your Neighborhood" Icon={MapPin} />
-              <FormTextArea id="profileBio" value={bio} onChange={setBio} placeholder="Tell your neighbors about yourself..." Icon={Info} />
+              <FormInput id="settingsName" type="text" value={name} onChange={setName} placeholder="Your Full Name" Icon={User} />
+              <FormInput id="settingsLocation" type="text" value={location} onChange={setLocation} placeholder="Your Neighborhood" Icon={MapPin} />
+              <FormTextArea id="settingsBio" value={bio} onChange={setBio} placeholder="Tell your neighbors about yourself..." Icon={Info} />
               
               <div className="flex items-center space-x-4">
                 <button
@@ -2123,4 +2134,3 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
     </section>
   );
 }
-
