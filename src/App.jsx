@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react'; // Added useRef
 import { 
   User, Lock, Mail, Book, Search, MessageSquare, Plus, Users, 
   Briefcase, ArrowRight, X, Menu, DollarSign, Repeat, MapPin, UserCheck,
@@ -220,6 +220,7 @@ function Navbar({ navigateTo, user, handleLogout, isMobileMenuOpen, setIsMobileM
 
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLoginMenuOpen, setIsLoginMenuOpen] = useState(false); 
 
   return (
     <header className="fixed top-0 left-0 right-0 bg-white shadow-md z-50">
@@ -324,12 +325,32 @@ function Navbar({ navigateTo, user, handleLogout, isMobileMenuOpen, setIsMobileM
                 )}
               </div>
             ) : (
-              <button 
-                onClick={() => navigateTo('login')}
-                className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-lg font-medium hover:bg-indigo-700 transition duration-150 ease-in-out shadow-sm"
-              >
-                Login / Sign Up
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setIsLoginMenuOpen(!isLoginMenuOpen)}
+                  onBlur={() => setTimeout(() => setIsLoginMenuOpen(false), 200)}
+                  className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-lg font-medium hover:bg-indigo-700 transition duration-150 ease-in-out shadow-sm flex items-center"
+                >
+                  Login
+                  <ChevronDown className={`h-5 w-5 ml-1 transition-transform ${isLoginMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
+                </button>
+                {isLoginMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 overflow-hidden border border-gray-100">
+                    <button
+                      onClick={() => { navigateTo('login'); setIsLoginMenuOpen(false); }}
+                      className="block w-full text-left px-4 py-3 text-lg text-gray-700 hover:bg-gray-100 transition duration-150"
+                    >
+                      Login
+                    </button>
+                    <button
+                      onClick={() => { navigateTo('login'); setIsLoginMenuOpen(false); }} 
+                      className="block w-full text-left px-4 py-3 text-lg text-gray-700 hover:bg-gray-100 transition duration-150"
+                    >
+                      Sign Up
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -407,12 +428,20 @@ function Navbar({ navigateTo, user, handleLogout, isMobileMenuOpen, setIsMobileM
                 </div>
               </>
             ) : (
-              <button 
-                onClick={() => navigateTo('login')}
-                className="bg-indigo-600 text-white w-full text-left mt-2 px-4 py-2 rounded-lg text-base font-medium hover:bg-indigo-700 transition duration-150 ease-in-out shadow-sm"
-              >
-                Login / Sign Up
-              </button>
+              <div className="border-t border-gray-200 mt-2 pt-2">
+                <button 
+                  onClick={() => navigateTo('login')}
+                  className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 block w-full text-left px-3 py-2 rounded-md text-base font-medium transition duration-150 ease-in-out"
+                >
+                  Login
+                </button>
+                <button 
+                  onClick={() => navigateTo('login')} 
+                  className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 block w-full text-left px-3 py-2 rounded-md text-base font-medium transition duration-150 ease-in-out"
+                >
+                  Sign Up
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -932,7 +961,6 @@ function RadioRole({ id, value, checked, onChange, label, Icon }) {
 function DashboardPage({ navigateTo, user, handleLogout, selectedConversation }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Default to 'overview' to match the new design
   const [dashboardPage, setDashboardPage] = useState('overview'); 
 
   useEffect(() => {
@@ -980,7 +1008,6 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
     
   }, [user]);
 
-  // Helper function to get the title for the header
   const getPageTitle = (page) => {
     switch (page) {
       case 'overview': return 'Dashboard Overview';
@@ -1003,8 +1030,7 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
   };
 
   const renderDashboardPage = () => {
-    // Pass user and profile to all pages
-    const pageProps = { user, profile, navigateTo, setDashboardPage, db }; // Pass db down
+    const pageProps = { user, profile, navigateTo, setDashboardPage, db };
 
     switch (dashboardPage) {
       case 'overview':
@@ -1036,7 +1062,7 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
       case 'profile':
         return <ProfileTab profile={profile} user={user} />;
       case 'settings':
-        return <DashboardSettingsPage {...pageProps} />; // Using a new settings page for dashboard
+        return <DashboardSettingsPage {...pageProps} handleLogout={handleLogout} />;
       default:
         return <DashboardOverview {...pageProps} />;
     }
@@ -1069,16 +1095,14 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
         profile={profile}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* The main content area now includes the header */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 md:p-8">
           <h1 className="text-3xl font-bold text-gray-900">
             {getPageTitle(dashboardPage)}
           </h1>
-          {/* Welcome message only shows on overview */}
           {dashboardPage === 'overview' && (
              <h2 className="text-2xl font-normal text-gray-600 mt-2 mb-6">
-              Welcome back, <span className="font-semibold text-indigo-600">{user.displayName}</span>!
-            </h2>
+             Welcome back, <span className="font-semibold text-indigo-600">{user.displayName}</span>!
+           </h2>
           )}
           
           <div className={dashboardPage === 'overview' ? "mt-0" : "mt-6"}>
@@ -1099,14 +1123,9 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
     { name: 'Upcoming Sessions', page: 'sessions', icon: Calendar },
     { name: 'Requests & Offers', page: 'requests', icon: GitPullRequest },
     { name: 'Community Feed', page: 'feed', icon: Users },
-    { name: 'Events', page: 'events', icon: Gift },
-    { name: 'Leaderboard', page: 'leaderboard', icon: Award },
-    { name: 'Peer Reviews', page: 'reviews', icon: Star },
     { name: 'Performance', page: 'performance', icon: BarChart2 },
     { name: 'Earnings', page: 'earnings', icon: DollarSign },
-    // --- THIS IS THE FIX ---
     { name: 'Messages', page: 'messages', icon: MessageSquare },
-    // --- END OF FIX ---
   ];
 
   const sidebarNavBottom = [
@@ -1114,7 +1133,6 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
     { name: 'My Profile', page: 'profile', icon: UserRound }
   ];
   
-  // Add 'My Skills' for teachers
   if (profile?.role === 'teacher') {
     sidebarNavTop.splice(2, 0, { name: 'My Skills', page: 'skills', icon: Briefcase });
   }
@@ -1122,7 +1140,6 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
   return (
     <div className="hidden md:flex md:flex-col md:w-64 bg-white border-r border-gray-200">
       <div className="flex flex-col flex-grow">
-        {/* Header */}
         <div className="flex items-center h-20 px-4">
           <button onClick={() => navigateTo('home')} className="flex items-center text-2xl font-bold text-gray-900 focus:outline-none">
             <Sparkles className="h-7 w-7 mr-2 text-indigo-600" />
@@ -1131,7 +1148,6 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
         </div>
         <p className="text-sm text-gray-500 px-4 -mt-4 mb-4">Skill Sharing Platform</p>
 
-        {/* Navigation */}
         <div className="flex-1 flex flex-col overflow-y-auto">
           <nav className="flex-1 px-2 py-2 space-y-1">
             {sidebarNavTop.map((item) => (
@@ -1151,7 +1167,6 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
           </nav>
         </div>
         
-        {/* Bottom Nav */}
         <div className="border-t border-gray-200 p-2 space-y-1">
           {sidebarNavBottom.map((item) => (
               <button
@@ -1181,7 +1196,6 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
 }
 
 
-// --- NEW DASHBOARD OVERVIEW (WITH LIVE DATA) ---
 function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) {
   const stats = [
     { name: 'Skills Learning', value: 3, icon: GraduationCap },
@@ -1189,7 +1203,6 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
     { name: 'Community Points', value: 150, icon: Award },
   ];
 
-  // --- START OF DATA FETCHING ---
   const [myCourses, setMyCourses] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
   
@@ -1202,8 +1215,6 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
   useEffect(() => {
     if (!user || !db) return;
 
-    // Fetch "My Courses" (skills user is enrolled in)
-    // Assumes an 'enrollments' collection exists
     const coursesQuery = query(
       collection(db, "enrollments"), 
       where("studentId", "==", user.uid), 
@@ -1220,12 +1231,10 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
       setLoadingCourses(false);
     });
 
-    // Fetch "Upcoming Sessions"
-    // Assumes a 'sessions' collection exists
     const sessionsQuery = query(
       collection(db, "sessions"), 
       where("participants", "array-contains", user.uid), 
-      where("sessionDate", ">", new Date()), // Only get future sessions
+      where("sessionDate", ">", new Date()), 
       orderBy("sessionDate", "asc"), 
       limit(2)
     );
@@ -1239,8 +1248,6 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
       setLoadingSessions(false);
     });
 
-    // Fetch "Community Feed"
-    // Assumes a 'posts' collection exists, as used in CommunityPage
     const feedQuery = query(
       collection(db, "posts"), 
       orderBy("createdAt", "desc"), 
@@ -1256,19 +1263,16 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
       setLoadingFeed(false);
     });
 
-    // Unsubscribe listeners on cleanup
     return () => {
       unsubCourses();
       unsubSessions();
       unsubFeed();
     };
 
-  }, [user, db]); // Add db to dependency array
-  // --- END OF DATA FETCHING ---
+  }, [user, db]);
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat) => (
           <div 
@@ -1286,7 +1290,6 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
         ))}
       </div>
 
-      {/* Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="relative bg-blue-500 p-6 rounded-lg shadow-lg text-white">
           <h3 className="flex items-center text-2xl font-bold mb-2">
@@ -1321,13 +1324,10 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
         </div>
       </div>
 
-      {/* New Widgets Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* My Courses / Community Feed Column */}
         <div className="lg:col-span-1 space-y-6">
           
-          {/* My Courses */}
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-xl font-bold text-gray-900 mb-4">My Courses</h3>
             {loadingCourses ? (
@@ -1351,7 +1351,6 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
             )}
           </div>
 
-          {/* Community Feed */}
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Community Feed</h3>
             {loadingFeed ? (
@@ -1366,7 +1365,6 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
                     <div className="ml-3">
                       <p className="text-sm text-gray-700 leading-snug">
                         <span className="font-bold">{post.authorName || 'User'}</span>{' '}
-                        {/* Truncate long content */}
                         {post.content?.length > 50 ? post.content.substring(0, 50) + '...' : post.content}
                       </p>
                     </div>
@@ -1379,10 +1377,8 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
           </div>
         </div>
 
-        {/* Upcoming Sessions / Performance Column */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Upcoming Sessions */}
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Upcoming Sessions</h3>
             {loadingSessions ? (
@@ -1408,11 +1404,9 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
             )}
           </div>
 
-          {/* Performance */}
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Performance</h3>
             <div className="h-48 flex items-center justify-center">
-              {/* This is a simple SVG placeholder for the graph */}
               <svg width="100%" height="100%" viewBox="0 0 300 100" preserveAspectRatio="none">
                 <path d="M 0 50 L 50 60 L 100 40 L 150 70 L 200 60 L 250 80 L 300 70" fill="none" stroke="#818cf8" strokeWidth="2" />
                 <path d="M 0 50 L 50 60 L 100 40 L 150 70 L 200 60 L 250 80 L 300 70" fill="#c7d2fe" fillOpacity="0.3" stroke="none" />
@@ -1434,11 +1428,7 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
     </div>
   );
 }
-// --- END OF NEW DASHBOARD OVERVIEW ---
 
-// --- START OF NEW DASHBOARD PAGES ---
-
-// Generic placeholder component
 function DashboardPlaceholderPage({ title, icon: Icon }) {
   return (
     <div className="bg-white p-6 rounded-lg shadow text-center">
@@ -1452,109 +1442,91 @@ function DashboardPlaceholderPage({ title, icon: Icon }) {
 }
 
 function MyCoursesPage({ user, profile }) {
-  // You can fetch and display the user's "learner" courses here
   return <DashboardPlaceholderPage title="My Courses" icon={Library} />;
 }
 
 function SkillRecommendationsPage({ user, profile }) {
-  // You can add logic for recommendations here
   return <DashboardPlaceholderPage title="Skill Recommendations" icon={Lightbulb} />;
 }
 
-// --- NEW LIVE UPCOMING SESSIONS PAGE ---
 function UpcomingSessionsPage({ user, profile, db }) {
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [upcomingSessions, setUpcomingSessions] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
 
   useEffect(() => {
     if (!user || !db) return;
-    setLoading(true);
 
     const sessionsQuery = query(
       collection(db, "sessions"), 
       where("participants", "array-contains", user.uid), 
-      where("sessionDate", ">", new Date()), // Only get future sessions
+      where("sessionDate", ">", new Date()), 
       orderBy("sessionDate", "asc")
     );
-    
-    const unsubscribe = onSnapshot(sessionsQuery, (snapshot) => {
-      const fetchedSessions = [];
-      snapshot.forEach(doc => {
-        fetchedSessions.push({ id: doc.id, ...doc.data() });
-      });
-      setSessions(fetchedSessions);
-      setLoading(false);
+    const unsubSessions = onSnapshot(sessionsQuery, (snapshot) => {
+      const sessions = [];
+      snapshot.forEach(doc => sessions.push({ id: doc.id, ...doc.data() }));
+      setUpcomingSessions(sessions);
+      setLoadingSessions(false);
     }, (err) => {
       console.error("Error fetching sessions: ", err);
-      setLoading(false);
+      setLoadingSessions(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubSessions();
   }, [user, db]);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Upcoming Sessions</h2>
-      {loading ? (
-        <p className="text-gray-500">Loading sessions...</p>
-      ) : sessions.length === 0 ? (
-        <p className="text-gray-500 text-lg text-center p-8">You have no upcoming sessions scheduled.</p>
-      ) : (
+      {loadingSessions ? (
+        <p className="text-gray-500 text-sm">Loading sessions...</p>
+      ) : upcomingSessions.length > 0 ? (
         <div className="space-y-4">
-          {sessions.map((session) => (
-            <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+          {upcomingSessions.map((session) => (
+            <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
-                <p className="font-bold text-lg text-gray-800">{session.title || 'Session'}</p>
-                <p className="text-sm text-gray-600">
+                <p className="font-medium text-gray-800">{session.title || 'Session'}</p>
+                <p className="text-sm text-gray-500">
                   {session.sessionDate ? new Date(session.sessionDate.seconds * 1000).toLocaleString() : 'Date TBD'}
                 </p>
-                {/* We'd need to fetch the other participant's name, but this is a good start */}
-                <p className="text-sm text-gray-500">With: {session.teacherName || 'Teacher'}</p> 
               </div>
               <button className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                View Details
+                View
               </button>
             </div>
           ))}
         </div>
+      ) : (
+        <p className="text-gray-500 text-lg text-center p-8">No upcoming sessions.</p>
       )}
     </div>
   );
 }
 
 function RequestsOffersPage({ user, profile }) {
-  // You can show lists of requests and offers here
   return <DashboardPlaceholderPage title="Requests & Offers" icon={GitPullRequest} />;
 }
 
 function EventsPage({ user, profile }) {
-  // You can show a local events calendar here
   return <DashboardPlaceholderPage title="Events" icon={Gift} />;
 }
 
 function LeaderboardPage({ user, profile }) {
-  // You can fetch and rank users by points here
   return <DashboardPlaceholderPage title="Leaderboard" icon={Award} />;
 }
 
 function PeerReviewsPage({ user, profile }) {
-  // You can show a list of reviews for the user here
   return <DashboardPlaceholderPage title="Peer Reviews" icon={Star} />;
 }
 
 function PerformancePage({ user, profile }) {
-  // You can build out charts and stats here
   return <DashboardPlaceholderPage title="Performance" icon={BarChart2} />;
 }
 
 function EarningsPage({ user, profile }) {
-  // You can show transaction history or skill exchange history here
   return <DashboardPlaceholderPage title="Earnings" icon={DollarSign} />;
 }
 
-// A new settings page, separate from the public profile editor
 function DashboardSettingsPage({ user, profile, handleLogout }) {
-  // This can be expanded with more settings like notifications, password change, etc.
   return (
     <div className="bg-white p-6 rounded-lg shadow max-w-lg">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Settings</h2>
@@ -1580,8 +1552,6 @@ function DashboardSettingsPage({ user, profile, handleLogout }) {
   );
 }
 
-// --- END OF NEW DASHBOARD PAGES ---
-
 
 function ProfileTab({ profile, user }) {
   const [name, setName] = useState(profile.name);
@@ -1592,11 +1562,21 @@ function ProfileTab({ profile, user }) {
   const [message, setMessage] = useState('');
   const [preview, setPreview] = useState(profile.photoURL || null);
 
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage('');
+      }, 3000); 
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const handleFileChange = (e) => {
     if (e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
       setPreview(URL.createObjectURL(selectedFile));
+      setMessage(''); 
     }
   };
 
@@ -1610,11 +1590,13 @@ function ProfileTab({ profile, user }) {
     try {
       const docRef = doc(db, "users", user.uid);
       let photoURL = profile.photoURL || '';
+      let fileWasUploaded = false; 
 
       if (file) {
         const storageRef = ref(storage, `profile-pics/${user.uid}`);
         await uploadBytes(storageRef, file);
         photoURL = await getDownloadURL(storageRef);
+        fileWasUploaded = true; 
       }
       
       const updatedData = {
@@ -1631,7 +1613,11 @@ function ProfileTab({ profile, user }) {
         photoURL: photoURL
       });
       
-      setMessage('Profile updated successfully!');
+      if (fileWasUploaded) {
+        setMessage('Profile picture added successfully!');
+      } else {
+        setMessage('Profile updated successfully!');
+      }
       setFile(null);
     } catch (error) {
       console.error("Error updating profile: ", error);
@@ -1681,7 +1667,7 @@ function ProfileTab({ profile, user }) {
             {isUploading ? 'Saving...' : 'Save Changes'}
           </button>
           {message && (
-            <span className={`flex items-center text-lg ${message.includes('Success') ? 'text-green-600' : 'text-red-600'}`}>
+            <span className={`flex items-center text-lg ${message.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
               <CheckCircle className="h-5 w-5 mr-2" />
               {message}
             </span>
@@ -1791,7 +1777,7 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
-  const messagesEndRef = useRef(null); // Ref for auto-scrolling
+  const messagesEndRef = useRef(null); 
 
   useEffect(() => {
     setLoading(true);
@@ -1810,7 +1796,6 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
       setLoading(false);
       
       if (initialConvo && !convos.find(c => c.id === initialConvo.id)) {
-        // If the initialConvo is not in the list, fetch it directly
         const fetchConvo = async () => {
           const convoDoc = await getDoc(doc(db, "conversations", initialConvo.id));
           if (convoDoc.exists()) {
@@ -1848,7 +1833,6 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
     return () => unsubscribe();
   }, [selectedConvo]);
   
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -2141,7 +2125,6 @@ function ContactUsPage() {
   );
 }
 
-// --- NEW COMMUNITY PAGE (LIVE DATA) ---
 function CommunityPage({ navigateTo, currentUser, isDashboard = false, db }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2150,7 +2133,6 @@ function CommunityPage({ navigateTo, currentUser, isDashboard = false, db }) {
   useEffect(() => {
     if (!db) return;
     setLoading(true);
-    // Fetch posts from Firestore
     const postsQuery = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     
     const unsubscribe = onSnapshot(postsQuery, (snapshot) => {
@@ -2166,7 +2148,7 @@ function CommunityPage({ navigateTo, currentUser, isDashboard = false, db }) {
     });
 
     return () => unsubscribe();
-  }, [db]); // Depend on db
+  }, [db]); 
 
   const handlePostSubmit = async (e) => {
     e.preventDefault();
@@ -2177,7 +2159,7 @@ function CommunityPage({ navigateTo, currentUser, isDashboard = false, db }) {
         content: newPost,
         authorName: currentUser.displayName || "Anonymous",
         authorId: currentUser.uid,
-        authorRole: "Learner", // TODO: fetch this from user profile
+        authorRole: "Learner", 
         createdAt: serverTimestamp(),
         likes: 0,
       });
@@ -2237,7 +2219,6 @@ function CommunityPage({ navigateTo, currentUser, isDashboard = false, db }) {
   );
 }
 
-// --- NEW SUB-COMPONENT FOR LIVE COMMENTS ---
 function PostItem({ post, currentUser, db }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -2518,7 +2499,7 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
                   {isUploading ? 'Saving...' : 'Save Changes'}
                 </button>
                 {message && (
-                  <span className={`flex items-center text-lg ${message.includes('Success') ? 'text-green-600' : 'text-red-600'}`}>
+                  <span className={`flex items-center text-lg ${message.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
                     <CheckCircle className="h-5 w-5 mr-2" />
                     {message}
                   </span>
@@ -2553,4 +2534,3 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
     </section>
   );
 }
-
