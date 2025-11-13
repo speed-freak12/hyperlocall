@@ -6,7 +6,7 @@ import {
   ChevronDown, Send, Settings, LogOut, Heart, Home, ThumbsUp, MessageSquareReply,
   Upload, CheckCircle, GraduationCap, Award, Calendar, GitPullRequest, 
   Star, BarChart2, TrendingUp, Gift, MessageCircleHeart, LayoutDashboard,
-  Library, Lightbulb, UserRound, Sparkles
+  Library, Lightbulb, UserRound, Sparkles, File as FileIcon
 } from 'lucide-react';
 import { initializeApp, setLogLevel } from 'firebase/app';
 import { 
@@ -561,7 +561,11 @@ function BrowsePage({ navigateTo, searchTerm }) {
 
   useEffect(() => {
     setLoading(true);
-    const skillsQuery = query(collection(db, "skills"));
+    // This query is correct: It only shows "approved" skills to the public
+    const skillsQuery = query(
+      collection(db, "skills"), 
+      where("status", "==", "approved")
+    );
     
     const unsubscribe = onSnapshot(skillsQuery, (querySnapshot) => {
       const skillsData = [];
@@ -601,7 +605,7 @@ function BrowsePage({ navigateTo, searchTerm }) {
         {loading ? (
           <p>Loading skills...</p>
         ) : filteredSkills.length === 0 ? (
-          <p>No skills found. Try a different search!</p>
+          <p>No approved skills found. Try a different search!</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredSkills.map((skill) => (
@@ -674,7 +678,12 @@ function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
       }
     };
 
-    const skillsQuery = query(collection(db, "skills"), where("teacherId", "==", teacherId));
+    // This query is correct: It only shows "approved" skills on public profiles
+    const skillsQuery = query(
+      collection(db, "skills"), 
+      where("teacherId", "==", teacherId),
+      where("status", "==", "approved") 
+    );
     const unsubscribeSkills = onSnapshot(skillsQuery, (querySnapshot) => {
       const skillsData = [];
       querySnapshot.forEach((doc) => {
@@ -800,7 +809,7 @@ function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
               ))}
             </div>
           ) : (
-            <p className="text-lg text-gray-600">This teacher hasn't listed any skills yet.</p>
+            <p className="text-lg text-gray-600">This teacher hasn't listed any approved skills yet.</p>
           )}
         </div>
       </div>
@@ -1678,6 +1687,7 @@ function ProfileTab({ profile, user }) {
   );
 }
 
+// *** THIS IS THE MODIFIED COMPONENT ***
 function ManageSkillsTab({ user, profile }) {
   const [mySkills, setMySkills] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1686,6 +1696,22 @@ function ManageSkillsTab({ user, profile }) {
   const [description, setDescription] = useState("");
   const [compensation, setCompensation] = useState("Monetary Fee");
   
+  // New state for file upload and submission status
+  const [certificate, setCertificate] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(""); // Can be "", "pending", "success", or "error"
+
+  // Effect to clear the success/error message
+  useEffect(() => {
+    if (submitStatus === "success" || submitStatus === "error") {
+      const timer = setTimeout(() => {
+        setSubmitStatus('');
+      }, 4000); 
+      return () => clearTimeout(timer);
+    }
+  }, [submitStatus]);
+  
+  // This correctly loads ALL of the current teacher's skills
   useEffect(() => {
     setLoading(true);
     const skillsQuery = query(collection(db, "skills"), where("teacherId", "==", user.uid));
@@ -1700,24 +1726,56 @@ function ManageSkillsTab({ user, profile }) {
     return () => unsubscribe();
   }, [user.uid]);
 
-  const handleAddSkill = async (e) => {
+  const handleFileChange = (e) => {
+    if (e.target.files[0]) {
+      setCertificate(e.target.files[0]);
+    } else {
+      setCertificate(null);
+    }
+  };
+
+  const handleSubmitSkill = async (e) => {
     e.preventDefault();
     if (!skillName || !description) return;
     
+    setIsSubmitting(true);
+    setSubmitStatus("pending"); // Show "Pending Verification..." on button
+
     try {
+      let certificateURL = "";
+
+      // 1. Upload certificate if it exists
+      if (certificate) {
+        const storageRef = ref(storage, `skill_certificates/${user.uid}/${Date.now()}_${certificate.name}`);
+        await uploadBytes(storageRef, certificate);
+        certificateURL = await getDownloadURL(storageRef);
+      }
+      
+      // 2. Add skill to Firestore with "pending" status
       await addDoc(collection(db, "skills"), {
         teacherId: user.uid,
         teacherName: profile.name,
         skillName: skillName,
         description: description,
         compensation: compensation,
+        certificateURL: certificateURL, // Add the URL
+        status: "pending", // Set status to pending
         createdAt: serverTimestamp()
       });
+
+      // 3. Reset form and show success
       setSkillName("");
       setDescription("");
       setCompensation("Monetary Fee");
+      setCertificate(null);
+      document.getElementById('certificate-upload').value = null; // Clear file input
+      setSubmitStatus("success"); // Show "Skill Submitted!"
+
     } catch (error) {
       console.error("Error adding skill: ", error);
+      setSubmitStatus("error"); // Show error message
+    } finally {
+      setIsSubmitting(false); // This will happen AFTER status is set to success/error
     }
   };
 
@@ -1725,9 +1783,35 @@ function ManageSkillsTab({ user, profile }) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
       <div className="p-6 bg-white rounded-lg shadow-lg">
         <h2 className="text-3xl font-bold text-gray-900 mb-6">Add a New Skill</h2>
-        <form onSubmit={handleAddSkill} className="space-y-4">
+        <form onSubmit={handleSubmitSkill} className="space-y-4">
           <FormInput id="skillName" type="text" value={skillName} onChange={setSkillName} placeholder="e.g., Guitar Lessons" Icon={Book} />
           <FormTextArea id="skillDesc" value={description} onChange={setDescription} placeholder="Describe your skill and teaching style..." Icon={Briefcase} />
+          
+          {/* New Certificate Upload Section */}
+          <div>
+            <label htmlFor="certificate-upload" className="block text-lg font-medium text-gray-900">
+              Upload Certificate (Optional)
+            </label>
+            <div className="mt-2 flex items-center">
+              <label htmlFor="certificate-upload" className="cursor-pointer bg-white border border-gray-300 rounded-md shadow-sm px-4 py-2 text-lg text-gray-700 hover:bg-gray-50 flex items-center">
+                <FileIcon className="h-5 w-5 mr-2 text-gray-500" />
+                <span>{certificate ? certificate.name : 'Choose file...'}</span>
+              </label>
+              <input
+                id="certificate-upload"
+                name="certificate-upload"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="sr-only"
+                onChange={handleFileChange}
+              />
+            </div>
+             <p className="text-sm text-gray-500 mt-2">
+              Only upload authentic certificates. This will be reviewed before approval.
+            </p>
+          </div>
+
+          {/* Compensation Section */}
           <div>
             <label className="block mb-2 text-lg font-medium text-gray-900">Compensation</label>
             <select
@@ -1740,13 +1824,31 @@ function ManageSkillsTab({ user, profile }) {
               <option>Flexible</option>
             </select>
           </div>
+
+          {/* Submit Button */}
           <button
             type="submit"
-            className="w-full flex items-center justify-center bg-indigo-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition"
+            disabled={isSubmitting}
+            className="w-full flex items-center justify-center bg-indigo-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition disabled:bg-gray-400"
           >
-            <Plus className="h-6 w-6 mr-2" />
-            Add Skill
+            <CheckCircle className="h-6 w-6 mr-2" />
+            {isSubmitting ? "Pending Verification..." : "Verify"}
           </button>
+          
+          {/* Submission Message Logic */}
+          <div className="h-6 text-center">
+            {submitStatus === "success" && (
+              <p className="font-medium text-green-600">
+                Skill Submitted for Verification!
+              </p>
+            )}
+            {submitStatus === "error" && (
+              <p className="font-medium text-red-600">
+                Error submitting skill. Please try again.
+              </p>
+            )}
+          </div>
+
         </form>
       </div>
 
@@ -1760,8 +1862,27 @@ function ManageSkillsTab({ user, profile }) {
           <div className="space-y-4">
             {mySkills.map(skill => (
               <div key={skill.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <h3 className="text-xl font-bold text-gray-900">{skill.skillName}</h3>
-                <p className="text-gray-600">{skill.compensation}</p>
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-bold text-gray-900">{skill.skillName}</h3>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    skill.status === 'pending' 
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {skill.status === 'pending' ? 'Pending' : 'Approved'}
+                  </span>
+                </div>
+                <p className="text-gray-600 mt-1">{skill.compensation}</p>
+                {skill.certificateURL && (
+                   <a 
+                    href={skill.certificateURL} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-sm text-indigo-600 hover:underline mt-1"
+                  >
+                    View Certificate
+                  </a>
+                )}
               </div>
             ))}
           </div>
