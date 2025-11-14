@@ -6,7 +6,7 @@ import {
   ChevronDown, Send, Settings, LogOut, Heart, Home, ThumbsUp, MessageSquareReply,
   Upload, CheckCircle, GraduationCap, Award, Calendar, GitPullRequest, 
   Star, BarChart2, TrendingUp, Gift, MessageCircleHeart, LayoutDashboard,
-  Library, Lightbulb, UserRound, Sparkles, File as FileIcon
+  Library, Lightbulb, UserRound, Sparkles, File as FileIcon, UserPlus
 } from 'lucide-react';
 import { initializeApp, setLogLevel } from 'firebase/app';
 import { 
@@ -31,7 +31,9 @@ import {
   orderBy,
   getDocs,
   updateDoc,
-  limit
+  limit,
+  arrayUnion,  // <-- Import arrayUnion
+  arrayRemove  // <-- Import arrayRemove
 } from "firebase/firestore";
 import { 
   getStorage, 
@@ -102,6 +104,7 @@ export default function App() {
       
       await updateProfile(user, { displayName: name });
       
+      // *** MODIFICATION 1: Add favorites and following arrays to new users ***
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         name: name,
@@ -110,7 +113,10 @@ export default function App() {
         location: location,
         bio: `Hi, I'm ${name}. I'm new to Hyperlocal and looking to ${role === 'learner' ? 'learn new skills' : 'teach my skills'}!`,
         createdAt: serverTimestamp(),
-        photoURL: ""
+        photoURL: "",
+        communityPoints: 0,
+        favorites: [],
+        following: []
       });
       navigateTo('dashboard');
     } catch (error) {
@@ -164,6 +170,8 @@ export default function App() {
       case 'community':
         return <CommunityPage navigateTo={navigateTo} currentUser={user} />;
       case 'favorites':
+        // We now have a page for this, but the logic isn't built. 
+        // We'll update the navigation to point to the new 'favorites' page in the dashboard.
         return user ? <MyFavoritesPage navigateTo={navigateTo} currentUser={user} /> : <LoginPage {...authHandlers} />;
       case 'settings':
         return user ? <SettingsPage navigateTo={navigateTo} currentUser={user} handleLogout={handleLogout} /> : <LoginPage {...authHandlers} />;
@@ -652,12 +660,20 @@ function SkillCard({ skill, navigateTo }) {
   );
 }
 
+// *** MODIFICATION 2: This is the updated TeacherProfilePage component ***
 function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
   const [teacher, setTeacher] = useState(null);
   const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messageError, setMessageError] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
+
+  // New state for follow/favorite
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Check if the current user is viewing their own profile
+  const isOwnProfile = currentUser.uid === teacherId;
 
   useEffect(() => {
     if (!teacherId) {
@@ -666,7 +682,8 @@ function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
     }
     setLoading(true);
 
-    const fetchProfile = async () => {
+    // Function to fetch teacher's main profile
+    const fetchTeacherProfile = async () => {
       if (!db || !teacherId) return;
       const docRef = doc(db, "users", teacherId);
       const docSnap = await getDoc(docRef);
@@ -675,6 +692,18 @@ function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
       } else {
         console.error("No such teacher profile!");
         navigateTo('browse');
+      }
+    };
+
+    // Function to fetch the CURRENT user's profile (to check for favs/follows)
+    const fetchCurrentUserProfile = async () => {
+      if (isOwnProfile) return; // No need to fetch if it's our own profile
+      const currentUserDocRef = doc(db, "users", currentUser.uid);
+      const currentUserDocSnap = await getDoc(currentUserDocRef);
+      if (currentUserDocSnap.exists()) {
+        const profileData = currentUserDocSnap.data();
+        setIsFollowing(profileData.following?.includes(teacherId) || false);
+        setIsFavorite(profileData.favorites?.includes(teacherId) || false);
       }
     };
 
@@ -692,18 +721,17 @@ function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
       setSkills(skillsData);
     });
 
-    Promise.all([fetchProfile()]).finally(() => setLoading(false));
+    // Run fetches
+    Promise.all([fetchTeacherProfile(), fetchCurrentUserProfile()]).finally(() => setLoading(false));
 
+    // Cleanup subscription
     return () => unsubscribeSkills();
-  }, [teacherId, navigateTo]);
+  }, [teacherId, navigateTo, currentUser.uid, isOwnProfile]);
 
   const handleStartConversation = async () => {
+    if (isOwnProfile) return;
     if (!currentUser) {
       navigateTo('login');
-      return;
-    }
-    if (currentUser.uid === teacherId) {
-      setMessageError("You cannot message yourself.");
       return;
     }
 
@@ -752,6 +780,35 @@ function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
     }
   };
 
+  // New function to handle following
+  const handleFollow = async () => {
+    if (isOwnProfile) return;
+    const currentUserDocRef = doc(db, "users", currentUser.uid);
+    try {
+      await updateDoc(currentUserDocRef, {
+        following: isFollowing ? arrayRemove(teacherId) : arrayUnion(teacherId)
+      });
+      setIsFollowing(!isFollowing);
+    } catch (error) {
+      console.error("Error updating follow status:", error);
+    }
+  };
+
+  // New function to handle favoriting
+  const handleFavorite = async () => {
+    if (isOwnProfile) return;
+    const currentUserDocRef = doc(db, "users", currentUser.uid);
+    try {
+      await updateDoc(currentUserDocRef, {
+        favorites: isFavorite ? arrayRemove(teacherId) : arrayUnion(teacherId)
+      });
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error("Error updating favorite status:", error);
+    }
+  };
+
+
   if (loading) {
     return <div className="py-24 px-4 text-center">Loading teacher profile...</div>;
   }
@@ -781,15 +838,47 @@ function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
           </div>
         </div>
 
+        {/* --- MODIFIED BUTTONS SECTION --- */}
         <div className="mt-10">
-          <button 
-            onClick={handleStartConversation}
-            disabled={isConnecting}
-            className="w-full max-w-lg mx-auto sm:mx-0 flex items-center justify-center bg-indigo-600 text-white px-8 py-4 rounded-lg text-lg font-medium hover:bg-indigo-700 transition duration-150 ease-in-out shadow-sm disabled:bg-gray-400"
-          >
-            <MessageSquare className="h-6 w-6 mr-3" />
-            {isConnecting ? "Connecting..." : `Connect with ${teacher.name.split(' ')[0]}`}
-          </button>
+          {!isOwnProfile ? (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-4 sm:space-y-0 w-full max-w-lg mx-auto sm:mx-0">
+              <button 
+                onClick={handleStartConversation}
+                disabled={isConnecting}
+                className="w-full sm:w-auto flex-grow flex items-center justify-center bg-indigo-600 text-white px-8 py-4 rounded-lg text-lg font-medium hover:bg-indigo-700 transition duration-150 ease-in-out shadow-sm disabled:bg-gray-400"
+              >
+                <MessageSquare className="h-6 w-6 mr-3" />
+                {isConnecting ? "Connecting..." : `Connect with ${teacher.name.split(' ')[0]}`}
+              </button>
+
+              <button
+                onClick={handleFavorite}
+                className={`flex items-center justify-center px-5 py-4 rounded-lg text-lg font-medium transition duration-150 ease-in-out border-2 ${
+                  isFavorite
+                    ? 'bg-red-50 border-red-200 text-red-600'
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <Heart className={`h-6 w-6 ${isFavorite ? 'fill-current' : ''}`} />
+              </button>
+
+              <button
+                onClick={handleFollow}
+                className={`flex items-center justify-center px-5 py-4 rounded-lg text-lg font-medium transition duration-150 ease-in-out border-2 ${
+                  isFollowing
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {isFollowing ? <UserCheck className="h-6 w-6" /> : <UserPlus className="h-6 w-6" />}
+              </button>
+
+            </div>
+          ) : (
+            <div className="w-full max-w-lg mx-auto sm:mx-0 p-4 bg-gray-100 rounded-lg text-center text-gray-700 font-medium">
+              This is your public profile.
+            </div>
+          )}
           {messageError && <p className="text-red-600 mt-2 text-center sm:text-left">{messageError}</p>}
         </div>
 
@@ -1001,7 +1090,10 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
             location: "Not set",
             bio: `Hi, I'm ${user.displayName || "a new user"}!`,
             createdAt: serverTimestamp(),
-            photoURL: ""
+            photoURL: "",
+            communityPoints: 0,
+            favorites: [],
+            following: []
           };
           await setDoc(docRef, defaultProfile);
           setProfile(defaultProfile);
@@ -1034,6 +1126,7 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
       case 'messages': return 'Messages';
       case 'profile': return 'My Profile';
       case 'settings': return 'Settings';
+      case 'favorites': return 'My Favorites'; // <-- Add title for favorites
       default: return 'Dashboard';
     }
   };
@@ -1072,6 +1165,8 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
         return <ProfileTab profile={profile} user={user} />;
       case 'settings':
         return <DashboardSettingsPage {...pageProps} handleLogout={handleLogout} />;
+      case 'favorites': // <-- Add case for favorites
+        return <FavoritesTab {...pageProps} />;
       default:
         return <DashboardOverview {...pageProps} />;
     }
@@ -1125,9 +1220,11 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
 
 function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDashboardPage, profile }) {
   
+  // *** MODIFICATION 3: Add Favorites to the sidebar ***
   const sidebarNavTop = [
     { name: 'Dashboard', page: 'overview', icon: LayoutDashboard },
     { name: 'My Courses', page: 'my-courses', icon: Library },
+    { name: 'My Favorites', page: 'favorites', icon: Heart },
     { name: 'Skill Recommendations', page: 'recommendations', icon: Lightbulb },
     { name: 'Upcoming Sessions', page: 'sessions', icon: Calendar },
     { name: 'Requests & Offers', page: 'requests', icon: GitPullRequest },
@@ -1143,7 +1240,7 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
   ];
   
   if (profile?.role === 'teacher') {
-    sidebarNavTop.splice(2, 0, { name: 'My Skills', page: 'skills', icon: Briefcase });
+    sidebarNavTop.splice(3, 0, { name: 'My Skills', page: 'skills', icon: Briefcase });
   }
 
   return (
@@ -1206,40 +1303,70 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
 
 
 function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) {
-  const stats = [
-    { name: 'Skills Learning', value: 3, icon: GraduationCap },
-    { name: 'Skills Teaching', value: 2, icon: Briefcase },
-    { name: 'Community Points', value: 150, icon: Award },
-  ];
-
-  const [myCourses, setMyCourses] = useState([]);
-  const [loadingCourses, setLoadingCourses] = useState(true);
   
+  // State for the dynamic counts
+  const [learningCount, setLearningCount] = useState(0);
+  const [teachingCount, setTeachingCount] = useState(0);
+  
+  // Existing state for lists
+  const [myCourses, setMyCourses] = useState([]); 
+  const [loadingCourses, setLoadingCourses] = useState(true); 
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
-
   const [communityFeed, setCommunityFeed] = useState([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
+
+  // New dynamic stats array, pulling from state and props
+  const stats = [
+    { name: 'Skills Learning', value: learningCount, icon: GraduationCap },
+    { name: 'Skills Teaching', value: teachingCount, icon: Briefcase },
+    { name: 'Community Points', value: profile.communityPoints ?? 0, icon: Award },
+  ];
 
   useEffect(() => {
     if (!user || !db) return;
 
-    const coursesQuery = query(
+    // 1. Get COUNT of Skills Learning (from "enrollments")
+    const learningCountQuery = query(
+      collection(db, "enrollments"), 
+      where("studentId", "==", user.uid)
+    );
+    const unsubLearningCount = onSnapshot(learningCountQuery, (snapshot) => {
+      setLearningCount(snapshot.size);
+    }, (err) => {
+      console.error("Error fetching learning count: ", err);
+    });
+
+    // 2. Get LIST of My Courses (for the list view, from "enrollments")
+    const coursesListQuery = query(
       collection(db, "enrollments"), 
       where("studentId", "==", user.uid), 
       orderBy("enrolledAt", "desc"), 
       limit(2)
     );
-    const unsubCourses = onSnapshot(coursesQuery, (snapshot) => {
+    const unsubCoursesList = onSnapshot(coursesListQuery, (snapshot) => {
       const courses = [];
       snapshot.forEach(doc => courses.push({ id: doc.id, ...doc.data() }));
       setMyCourses(courses);
       setLoadingCourses(false);
     }, (err) => {
-      console.error("Error fetching courses: ", err);
+      console.error("Error fetching courses list: ", err);
       setLoadingCourses(false);
     });
 
+    // 3. Get COUNT of Skills Teaching
+    const teachingQuery = query(
+      collection(db, "skills"),
+      where("teacherId", "==", user.uid),
+      where("status", "==", "approved") // Only count *approved* skills
+    );
+    const unsubTeaching = onSnapshot(teachingQuery, (snapshot) => {
+      setTeachingCount(snapshot.size);
+    }, (err) => {
+      console.error("Error fetching teaching skills:", err);
+    });
+    
+    // 4. Get Upcoming Sessions (existing logic)
     const sessionsQuery = query(
       collection(db, "sessions"), 
       where("participants", "array-contains", user.uid), 
@@ -1257,6 +1384,7 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
       setLoadingSessions(false);
     });
 
+    // 5. Get Community Feed (existing logic)
     const feedQuery = query(
       collection(db, "posts"), 
       orderBy("createdAt", "desc"), 
@@ -1272,13 +1400,17 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
       setLoadingFeed(false);
     });
 
+    // 6. Cleanup all subscriptions
     return () => {
-      unsubCourses();
+      unsubLearningCount();
+      unsubCoursesList();
+      unsubTeaching();
       unsubSessions();
       unsubFeed();
     };
 
   }, [user, db]);
+
 
   return (
     <div className="space-y-6">
@@ -1687,7 +1819,7 @@ function ProfileTab({ profile, user }) {
   );
 }
 
-// *** THIS IS THE MODIFIED COMPONENT ***
+// *** MODIFICATION 4: This is the updated ManageSkillsTab component ***
 function ManageSkillsTab({ user, profile }) {
   const [mySkills, setMySkills] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2061,20 +2193,76 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
   );
 }
 
-function FavoritesTab({ navigateTo, user }) {
+// *** MODIFICATION 5: This is the updated FavoritesTab component ***
+function FavoritesTab({ user, profile, navigateTo, db }) {
+  const [favoriteTeachers, setFavoriteTeachers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!profile || !profile.favorites || profile.favorites.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchFavorites = async () => {
+      setLoading(true);
+      const favsList = [];
+      // We have to fetch each favorite teacher one by one
+      for (const teacherId of profile.favorites) {
+        const docRef = doc(db, "users", teacherId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          favsList.push({ id: docSnap.id, ...docSnap.data() });
+        }
+      }
+      setFavoriteTeachers(favsList);
+      setLoading(false);
+    };
+
+    fetchFavorites();
+  }, [profile, db]);
+
   return (
-    <div className="p-6 bg-white rounded-lg shadow-lg text-center">
-      <Heart className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
-      <h3 className="text-2xl font-bold text-gray-900 mb-2">My Favorites</h3>
-      <p className="text-lg text-gray-600 mb-6">
-        This is where you'll find all your saved skills and teachers. This feature is coming soon!
-      </p>
-      <button 
-        onClick={() => navigateTo('browse')}
-        className="bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition duration-150 ease-in-out shadow-sm"
-      >
-        Browse Skills
-      </button>
+    <div className="bg-white p-6 rounded-lg shadow-lg">
+      {loading ? (
+        <p>Loading favorites...</p>
+      ) : favoriteTeachers.length === 0 ? (
+        <div className="text-center p-8">
+          <Heart className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">No Favorites Yet</h3>
+          <p className="text-lg text-gray-600 mb-6">
+            Click the heart icon on a teacher's profile to add them here.
+          </p>
+          <button 
+            onClick={() => navigateTo('browse')}
+            className="bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition duration-150 ease-in-out shadow-sm"
+          >
+            Browse Skills
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {favoriteTeachers.map(teacher => (
+            <div key={teacher.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex flex-col items-center">
+              {teacher.photoURL ? (
+                <img src={teacher.photoURL} alt={teacher.name} className="h-24 w-24 rounded-full object-cover" />
+              ) : (
+                <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                  <User className="h-12 w-12" />
+                </div>
+              )}
+              <h4 className="text-xl font-bold text-gray-900 mt-4">{teacher.name}</h4>
+              <p className="text-gray-600">{teacher.location}</p>
+              <button
+                onClick={() => navigateTo('teacherProfile', { teacherId: teacher.id })}
+                className="mt-4 w-full text-center bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-base font-medium hover:bg-indigo-200 transition"
+              >
+                View Profile
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2456,6 +2644,7 @@ function PostItem({ post, currentUser, db }) {
 
 
 function MyFavoritesPage({ navigateTo, currentUser }) {
+  // This page is now handled by the new `FavoritesTab` component via the DashboardPage router
   return (
     <section className="py-24 bg-white min-h-screen pt-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
