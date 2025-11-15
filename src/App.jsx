@@ -6,7 +6,7 @@ import {
   ChevronDown, Send, Settings, LogOut, Heart, Home, ThumbsUp, MessageSquareReply,
   Upload, CheckCircle, GraduationCap, Award, Calendar, GitPullRequest, 
   Star, BarChart2, TrendingUp, Gift, MessageCircleHeart, LayoutDashboard,
-  Library, Lightbulb, UserRound, Sparkles, File as FileIcon, UserPlus
+  Library, Lightbulb, UserRound, Sparkles, File as FileIcon, UserPlus, BookOpen
 } from 'lucide-react';
 import { initializeApp, setLogLevel } from 'firebase/app';
 import { 
@@ -1316,11 +1316,11 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
   const [communityFeed, setCommunityFeed] = useState([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
 
-  // New dynamic stats array, pulling from state and props
+  // --- MODIFICATION 1: Add 'page' property to make cards clickable ---
   const stats = [
-    { name: 'Skills Learning', value: learningCount, icon: GraduationCap },
-    { name: 'Skills Teaching', value: teachingCount, icon: Briefcase },
-    { name: 'Community Points', value: profile.communityPoints ?? 0, icon: Award },
+    { name: 'Skills Learning', value: learningCount, icon: GraduationCap, page: 'my-courses' },
+    { name: 'Skills Teaching', value: teachingCount, icon: Briefcase, page: 'skills' },
+    { name: 'Community Points', value: profile.communityPoints ?? 0, icon: Award, page: null }, // Not clickable
   ];
 
   useEffect(() => {
@@ -1414,21 +1414,36 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
 
   return (
     <div className="space-y-6">
+      {/* --- MODIFICATION 2: Change mapping to create buttons --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat) => (
-          <div 
-            key={stat.name} 
-            className="bg-white p-5 rounded-lg shadow flex items-center"
-          >
-            <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
-              <stat.icon className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">{stat.name}</p>
-              <p className="text-4xl font-bold text-gray-900">{stat.value}</p>
-            </div>
-          </div>
-        ))}
+        {stats.map((stat) => {
+          const isClickable = !!stat.page;
+          // Render a button if clickable, otherwise a div
+          const Tag = isClickable ? 'button' : 'div';
+          const props = isClickable ? {
+            onClick: () => setDashboardPage(stat.page)
+          } : {};
+
+          return (
+            <Tag
+              key={stat.name} 
+              className={`bg-white p-5 rounded-lg shadow flex items-center text-left ${
+                isClickable 
+                ? 'cursor-pointer w-full hover:shadow-lg transition-shadow duration-200' 
+                : ''
+              }`}
+              {...props}
+            >
+              <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
+                <stat.icon className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">{stat.name}</p>
+                <p className="text-4xl font-bold text-gray-900">{stat.value}</p>
+              </div>
+            </Tag>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1582,8 +1597,82 @@ function DashboardPlaceholderPage({ title, icon: Icon }) {
   );
 }
 
-function MyCoursesPage({ user, profile }) {
-  return <DashboardPlaceholderPage title="My Courses" icon={Library} />;
+// --- MODIFICATION 3: Replace placeholder MyCoursesPage ---
+function MyCoursesPage({ user, db, navigateTo }) {
+  const [myCourses, setMyCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user || !db) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+
+    const coursesQuery = query(
+      collection(db, "enrollments"),
+      where("studentId", "==", user.uid),
+      orderBy("enrolledAt", "desc")
+    );
+    
+    const unsubscribe = onSnapshot(coursesQuery, (snapshot) => {
+      const courses = [];
+      snapshot.forEach(doc => courses.push({ id: doc.id, ...doc.data() }));
+      setMyCourses(courses);
+      setLoading(false);
+    }, (err) => {
+      console.error("Error fetching courses: ", err);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, db]);
+
+  if (loading) {
+    return <p className="text-gray-500">Loading your courses...</p>;
+  }
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-lg">
+      {myCourses.length === 0 ? (
+        <div className="text-center p-8">
+          <Library className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">No Courses Yet</h3>
+          <p className="text-lg text-gray-600 mb-6">
+            You haven't enrolled in any skills. Start learning!
+          </p>
+          <button 
+            onClick={() => navigateTo('browse')}
+            className="bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition"
+          >
+            Browse Skills
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {myCourses.map((course) => (
+            <div key={course.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold text-gray-900">{course.skillName}</h4>
+                  <p className="text-gray-600">Taught by {course.teacherName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => navigateTo('teacherProfile', { teacherId: course.teacherId })}
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                View Teacher
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SkillRecommendationsPage({ user, profile }) {
@@ -2007,13 +2096,13 @@ function ManageSkillsTab({ user, profile }) {
                 <p className="text-gray-600 mt-1">{skill.compensation}</p>
                 {skill.certificateURL && (
                    <a 
-                    href={skill.certificateURL} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-sm text-indigo-600 hover:underline mt-1"
-                  >
-                    View Certificate
-                  </a>
+                     href={skill.certificateURL} 
+                     target="_blank" 
+                     rel="noopener noreferrer" 
+                     className="text-sm text-indigo-600 hover:underline mt-1"
+                   >
+                     View Certificate
+                   </a>
                 )}
               </div>
             ))}
