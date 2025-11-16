@@ -6,7 +6,8 @@ import {
   ChevronDown, Send, Settings, LogOut, Heart, Home, ThumbsUp, MessageSquareReply,
   Upload, CheckCircle, GraduationCap, Award, Calendar, GitPullRequest, 
   Star, BarChart2, TrendingUp, Gift, MessageCircleHeart, LayoutDashboard,
-  Library, Lightbulb, UserRound, Sparkles, File as FileIcon, UserPlus, BookOpen
+  Library, Lightbulb, UserRound, Sparkles, File as FileIcon, UserPlus,
+  CreditCard // <-- Added CreditCard
 } from 'lucide-react';
 import { initializeApp, setLogLevel } from 'firebase/app';
 import { 
@@ -32,8 +33,8 @@ import {
   getDocs,
   updateDoc,
   limit,
-  arrayUnion,  // <-- Import arrayUnion
-  arrayRemove  // <-- Import arrayRemove
+  arrayUnion, 
+  arrayRemove 
 } from "firebase/firestore";
 import { 
   getStorage, 
@@ -42,6 +43,7 @@ import {
   getDownloadURL 
 } from "firebase/storage";
 
+// WARNING: This is a demo config. Replace with your actual Firebase project config.
 const firebaseConfig = {
   apiKey: "AIzaSyDty5os84VgLNRZTDAHErleYUOc9zBnaa0",
   authDomain: "hyperlocall.firebaseapp.com",
@@ -104,7 +106,6 @@ export default function App() {
       
       await updateProfile(user, { displayName: name });
       
-      // *** MODIFICATION 1: Add favorites and following arrays to new users ***
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         name: name,
@@ -170,11 +171,14 @@ export default function App() {
       case 'community':
         return <CommunityPage navigateTo={navigateTo} currentUser={user} />;
       case 'favorites':
-        // We now have a page for this, but the logic isn't built. 
-        // We'll update the navigation to point to the new 'favorites' page in the dashboard.
-        return user ? <MyFavoritesPage navigateTo={navigateTo} currentUser={user} /> : <LoginPage {...authHandlers} />;
+        // This is now handled by the dashboard router
+        return user ? <DashboardPage navigateTo={navigateTo} user={user} handleLogout={handleLogout} selectedConversation={selectedConversation} /> : <LoginPage {...authHandlers} />;
       case 'settings':
-        return user ? <SettingsPage navigateTo={navigateTo} currentUser={user} handleLogout={handleLogout} /> : <LoginPage {...authHandlers} />;
+        // This is now handled by the dashboard router
+        return user ? <DashboardPage navigateTo={navigateTo} user={user} handleLogout={handleLogout} selectedConversation={selectedConversation} /> : <LoginPage {...authHandlers} />;
+      // *** MODIFICATION 1: Add new case for Subscription page ***
+      case 'subscription':
+        return <SubscriptionPage navigateTo={navigateTo} />;
       default:
         return <HomePage navigateTo={navigateTo} />;
     }
@@ -219,11 +223,13 @@ export default function App() {
   );
 }
 
+// *** MODIFICATION 2: Updated Navbar component ***
 function Navbar({ navigateTo, user, handleLogout, isMobileMenuOpen, setIsMobileMenuOpen }) {
   const navItems = [
     { name: 'How It Works', page: 'how-it-works' },
     { name: 'About Us', page: 'about' },
     { name: 'Community', page: 'community' },
+    { name: 'Subscription', page: 'subscription' } // <-- Changed from Pricing
   ];
 
   const [isSupportOpen, setIsSupportOpen] = useState(false);
@@ -660,7 +666,6 @@ function SkillCard({ skill, navigateTo }) {
   );
 }
 
-// *** MODIFICATION 2: This is the updated TeacherProfilePage component ***
 function TeacherProfilePage({ navigateTo, teacherId, currentUser }) {
   const [teacher, setTeacher] = useState(null);
   const [skills, setSkills] = useState([]);
@@ -1126,7 +1131,7 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
       case 'messages': return 'Messages';
       case 'profile': return 'My Profile';
       case 'settings': return 'Settings';
-      case 'favorites': return 'My Favorites'; // <-- Add title for favorites
+      case 'favorites': return 'My Favorites'; 
       default: return 'Dashboard';
     }
   };
@@ -1165,7 +1170,7 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
         return <ProfileTab profile={profile} user={user} />;
       case 'settings':
         return <DashboardSettingsPage {...pageProps} handleLogout={handleLogout} />;
-      case 'favorites': // <-- Add case for favorites
+      case 'favorites':
         return <FavoritesTab {...pageProps} />;
       default:
         return <DashboardOverview {...pageProps} />;
@@ -1200,16 +1205,16 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 md:p-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {getPageTitle(dashboardPage)}
-          </h1>
-          {dashboardPage === 'overview' && (
-             <h2 className="text-2xl font-normal text-gray-600 mt-2 mb-6">
-             Welcome back, <span className="font-semibold text-indigo-600">{user.displayName}</span>!
-           </h2>
+          {/* We render the title inside the page component now
+            so the overview can have its custom welcome message.
+          */}
+          {dashboardPage !== 'overview' && (
+            <h1 className="text-3xl font-bold text-gray-900 mb-6">
+              {getPageTitle(dashboardPage)}
+            </h1>
           )}
           
-          <div className={dashboardPage === 'overview' ? "mt-0" : "mt-6"}>
+          <div>
             {renderDashboardPage()}
           </div>
         </main>
@@ -1220,7 +1225,6 @@ function DashboardPage({ navigateTo, user, handleLogout, selectedConversation })
 
 function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDashboardPage, profile }) {
   
-  // *** MODIFICATION 3: Add Favorites to the sidebar ***
   const sidebarNavTop = [
     { name: 'Dashboard', page: 'overview', icon: LayoutDashboard },
     { name: 'My Courses', page: 'my-courses', icon: Library },
@@ -1302,31 +1306,17 @@ function DashboardSidebar({ user, handleLogout, navigateTo, dashboardPage, setDa
 }
 
 
+// *** MODIFICATION 3: This is the updated DashboardOverview component ***
 function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) {
   
   // State for the dynamic counts
   const [learningCount, setLearningCount] = useState(0);
   const [teachingCount, setTeachingCount] = useState(0);
   
-  // Existing state for lists
-  const [myCourses, setMyCourses] = useState([]); 
-  const [loadingCourses, setLoadingCourses] = useState(true); 
-  const [upcomingSessions, setUpcomingSessions] = useState([]);
-  const [loadingSessions, setLoadingSessions] = useState(true);
-  const [communityFeed, setCommunityFeed] = useState([]);
-  const [loadingFeed, setLoadingFeed] = useState(true);
-
-  // --- MODIFICATION 1: Add 'page' property to make cards clickable ---
-  const stats = [
-    { name: 'Skills Learning', value: learningCount, icon: GraduationCap, page: 'my-courses' },
-    { name: 'Skills Teaching', value: teachingCount, icon: Briefcase, page: 'skills' },
-    { name: 'Community Points', value: profile.communityPoints ?? 0, icon: Award, page: null }, // Not clickable
-  ];
-
   useEffect(() => {
     if (!user || !db) return;
 
-    // 1. Get COUNT of Skills Learning (from "enrollments")
+    // Get COUNT of Skills Learning (from "enrollments")
     const learningCountQuery = query(
       collection(db, "enrollments"), 
       where("studentId", "==", user.uid)
@@ -1337,24 +1327,7 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
       console.error("Error fetching learning count: ", err);
     });
 
-    // 2. Get LIST of My Courses (for the list view, from "enrollments")
-    const coursesListQuery = query(
-      collection(db, "enrollments"), 
-      where("studentId", "==", user.uid), 
-      orderBy("enrolledAt", "desc"), 
-      limit(2)
-    );
-    const unsubCoursesList = onSnapshot(coursesListQuery, (snapshot) => {
-      const courses = [];
-      snapshot.forEach(doc => courses.push({ id: doc.id, ...doc.data() }));
-      setMyCourses(courses);
-      setLoadingCourses(false);
-    }, (err) => {
-      console.error("Error fetching courses list: ", err);
-      setLoadingCourses(false);
-    });
-
-    // 3. Get COUNT of Skills Teaching
+    // Get COUNT of Skills Teaching
     const teachingQuery = query(
       collection(db, "skills"),
       where("teacherId", "==", user.uid),
@@ -1365,225 +1338,92 @@ function DashboardOverview({ user, profile, navigateTo, setDashboardPage, db }) 
     }, (err) => {
       console.error("Error fetching teaching skills:", err);
     });
-    
-    // 4. Get Upcoming Sessions (existing logic)
-    const sessionsQuery = query(
-      collection(db, "sessions"), 
-      where("participants", "array-contains", user.uid), 
-      where("sessionDate", ">", new Date()), 
-      orderBy("sessionDate", "asc"), 
-      limit(2)
-    );
-    const unsubSessions = onSnapshot(sessionsQuery, (snapshot) => {
-      const sessions = [];
-      snapshot.forEach(doc => sessions.push({ id: doc.id, ...doc.data() }));
-      setUpcomingSessions(sessions);
-      setLoadingSessions(false);
-    }, (err) => {
-      console.error("Error fetching sessions: ", err);
-      setLoadingSessions(false);
-    });
 
-    // 5. Get Community Feed (existing logic)
-    const feedQuery = query(
-      collection(db, "posts"), 
-      orderBy("createdAt", "desc"), 
-      limit(2)
-    );
-    const unsubFeed = onSnapshot(feedQuery, (snapshot) => {
-      const posts = [];
-      snapshot.forEach(doc => posts.push({ id: doc.id, ...doc.data() }));
-      setCommunityFeed(posts);
-      setLoadingFeed(false);
-    }, (err) => {
-      console.error("Error fetching feed: ", err);
-      setLoadingFeed(false);
-    });
-
-    // 6. Cleanup all subscriptions
     return () => {
       unsubLearningCount();
-      unsubCoursesList();
       unsubTeaching();
-      unsubSessions();
-      unsubFeed();
     };
-
   }, [user, db]);
 
 
   return (
     <div className="space-y-6">
-      {/* --- MODIFICATION 2: Change mapping to create buttons --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat) => {
-          const isClickable = !!stat.page;
-          // Render a button if clickable, otherwise a div
-          const Tag = isClickable ? 'button' : 'div';
-          const props = isClickable ? {
-            onClick: () => setDashboardPage(stat.page)
-          } : {};
-
-          return (
-            <Tag
-              key={stat.name} 
-              className={`bg-white p-5 rounded-lg shadow flex items-center text-left ${
-                isClickable 
-                ? 'cursor-pointer w-full hover:shadow-lg transition-shadow duration-200' 
-                : ''
-              }`}
-              {...props}
-            >
-              <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
-                <stat.icon className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">{stat.name}</p>
-                <p className="text-4xl font-bold text-gray-900">{stat.value}</p>
-              </div>
-            </Tag>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="relative bg-blue-500 p-6 rounded-lg shadow-lg text-white">
-          <h3 className="flex items-center text-2xl font-bold mb-2">
-            <Search className="h-6 w-6 mr-2" />
-            Find Skills to Learn
-          </h3>
-          <p className="text-base mb-4 text-blue-100">
-            Discover new skills in your neighborhood.
-          </p>
-          <button 
-            onClick={() => navigateTo('browse')}
-            className="bg-white text-blue-700 font-semibold px-5 py-2 rounded-lg text-base hover:bg-gray-100 transition-colors shadow"
-          >
-            Explore Skills
-          </button>
-        </div>
+      <h1 className="text-3xl font-bold text-gray-900">
+        Dashboard Overview
+      </h1>
+      <h2 className="text-2xl font-normal text-gray-600 -mt-4 mb-6">
+         Welcome back, <span className="font-semibold text-indigo-600">{user.displayName}</span>!
+      </h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        {/* Card 1: My Skills */}
+        <DashboardOverviewCard
+          title="My Skills"
+          description={`You are currently teaching ${teachingCount} skill${teachingCount === 1 ? '' : 's'}.`}
+          icon={Briefcase}
+          onClick={() => setDashboardPage('skills')}
+          color="blue"
+        />
         
-        <div className="relative bg-amber-500 p-6 rounded-lg shadow-lg text-white">
-          <h3 className="flex items-center text-2xl font-bold mb-2">
-            <Briefcase className="h-6 w-6 mr-2" />
-            Share Your Skills
-          </h3>
-          <p className="text-base mb-4 text-amber-100">
-            Teach others what you know.
-          </p>
-          <button 
-            onClick={() => setDashboardPage('skills')}
-            className="bg-white text-amber-700 font-semibold px-5 py-2 rounded-lg text-base hover:bg-gray-100 transition-colors shadow"
-          >
-            Start Teaching
-          </button>
-        </div>
+        {/* Card 2: My Courses */}
+        <DashboardOverviewCard
+          title="My Courses"
+          description={`You are currently learning ${learningCount} skill${learningCount === 1 ? '' : 's'}.`}
+          icon={GraduationCap}
+          onClick={() => setDashboardPage('my-courses')}
+          color="green"
+        />
+
+        {/* Card 3: Messages */}
+        <DashboardOverviewCard
+          title="Messages"
+          description="Check your inbox and chat with other users."
+          icon={MessageSquare}
+          onClick={() => setDashboardPage('messages')}
+          color="yellow"
+        />
+
+        {/* Card 4: Subscription */}
+        <DashboardOverviewCard
+          title="Subscription"
+          description="Manage your current plan and billing details."
+          icon={CreditCard}
+          onClick={() => navigateTo('subscription')} // This navigates *out* of the dashboard
+          color="purple"
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <div className="lg:col-span-1 space-y-6">
-          
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">My Courses</h3>
-            {loadingCourses ? (
-              <p className="text-gray-500 text-sm">Loading courses...</p>
-            ) : myCourses.length > 0 ? (
-              <div className="space-y-4">
-                {myCourses.map((course) => (
-                  <div key={course.id} className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-gray-100 rounded-full mr-3">
-                        <Book className="h-5 w-5 text-gray-600" />
-                      </div>
-                      <span className="font-medium text-gray-700">{course.skillName || 'Course'}</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-500">{course.progress || '0/5'}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No courses yet. Start learning!</p>
-            )}
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Community Feed</h3>
-            {loadingFeed ? (
-               <p className="text-gray-500 text-sm">Loading feed...</p>
-            ) : communityFeed.length > 0 ? (
-              <div className="space-y-4">
-                {communityFeed.map((post) => (
-                  <div key={post.id} className="flex">
-                    <div className="flex-shrink-0 h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-bold">
-                      {post.authorName ? post.authorName.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-gray-700 leading-snug">
-                        <span className="font-bold">{post.authorName || 'User'}</span>{' '}
-                        {post.content?.length > 50 ? post.content.substring(0, 50) + '...' : post.content}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No community posts yet.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 space-y-6">
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Upcoming Sessions</h3>
-            {loadingSessions ? (
-              <p className="text-gray-500 text-sm">Loading sessions...</p>
-            ) : upcomingSessions.length > 0 ? (
-              <div className="space-y-4">
-                {upcomingSessions.map((session) => (
-                  <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-800">{session.title || 'Session'}</p>
-                      <p className="text-sm text-gray-500">
-                        {session.sessionDate ? new Date(session.sessionDate.seconds * 1000).toLocaleString() : 'Date TBD'}
-                      </p>
-                    </div>
-                    <button className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                      View
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">No upcoming sessions.</p>
-            )}
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Performance</h3>
-            <div className="h-48 flex items-center justify-center">
-              <svg width="100%" height="100%" viewBox="0 0 300 100" preserveAspectRatio="none">
-                <path d="M 0 50 L 50 60 L 100 40 L 150 70 L 200 60 L 250 80 L 300 70" fill="none" stroke="#818cf8" strokeWidth="2" />
-                <path d="M 0 50 L 50 60 L 100 40 L 150 70 L 200 60 L 250 80 L 300 70" fill="#c7d2fe" fillOpacity="0.3" stroke="none" />
-                <circle cx="50" cy="60" r="3" fill="#4f46e5" />
-                <circle cx="100" cy="40" r="3" fill="#4f46e5" />
-                <circle cx="150" cy="70" r="3" fill="#4f46e5" />
-                <circle cx="200" cy="60" r="3" fill="#4f46e5" />
-                <circle cx="250" cy="80" r="3" fill="#4f46e5" />
-                <circle cx="300" cy="70" r="3" fill="#4f46e5" />
-              </svg>
-            </div>
-            <div className="flex justify-between text-sm text-gray-500 mt-2">
-              <span>M</span><span>T</span><span>W</span><span>Th</span><span>F</span><span>Sa</span><span>Su</span>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      {/* Other components like quick links or community feed can go here */}
+      
     </div>
   );
 }
+
+// *** MODIFICATION 4: New helper component for dashboard cards ***
+function DashboardOverviewCard({ title, description, icon: Icon, onClick, color }) {
+  const colors = {
+    blue: "bg-blue-100 text-blue-700",
+    green: "bg-green-100 text-green-700",
+    yellow: "bg-yellow-100 text-yellow-700",
+    purple: "bg-purple-100 text-purple-700",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className="bg-white p-6 rounded-lg shadow-lg flex items-start space-x-4 transition-transform transform hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left"
+    >
+      <div className={`p-3 rounded-full ${colors[color] || colors.blue}`}>
+        <Icon className="h-6 w-6" />
+      </div>
+      <div>
+        <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+        <p className="text-gray-600 mt-1">{description}</p>
+      </div>
+    </button>
+  );
+}
+
 
 function DashboardPlaceholderPage({ title, icon: Icon }) {
   return (
@@ -1597,31 +1437,61 @@ function DashboardPlaceholderPage({ title, icon: Icon }) {
   );
 }
 
-// --- MODIFICATION 3: Replace placeholder MyCoursesPage ---
-function MyCoursesPage({ user, db, navigateTo }) {
-  const [myCourses, setMyCourses] = useState([]);
+// *** MODIFICATION 5: This is the new MyCoursesPage component ***
+function MyCoursesPage({ user, profile, db, navigateTo }) {
+  const [enrolledSkills, setEnrolledSkills] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !db) {
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
     setLoading(true);
-
-    const coursesQuery = query(
+    
+    // We created "enrollments" in the DashboardOverview, let's query that
+    // If you don't have an "enrollments" collection, you'd query skills based on 
+    // an array in the user's profile, e.g., where("skillId", "in", profile.learning)
+    
+    // This assumes you have an 'enrollments' collection
+    const enrollmentsQuery = query(
       collection(db, "enrollments"),
       where("studentId", "==", user.uid),
       orderBy("enrolledAt", "desc")
     );
-    
-    const unsubscribe = onSnapshot(coursesQuery, (snapshot) => {
-      const courses = [];
-      snapshot.forEach(doc => courses.push({ id: doc.id, ...doc.data() }));
-      setMyCourses(courses);
+
+    const unsubscribe = onSnapshot(enrollmentsQuery, async (snapshot) => {
+      if (snapshot.empty) {
+        setEnrolledSkills([]);
+        setLoading(false);
+        return;
+      }
+
+      // Since the enrollment only stores IDs, we need to fetch the skill/teacher details
+      const skillsPromises = snapshot.docs.map(async (enrollDoc) => {
+        const enrollmentData = enrollDoc.data();
+        
+        // Fetch the skill
+        const skillDocRef = doc(db, "skills", enrollmentData.skillId);
+        const skillDocSnap = await getDoc(skillDocRef);
+        
+        // Fetch the teacher
+        const teacherDocRef = doc(db, "users", enrollmentData.teacherId);
+        const teacherDocSnap = await getDoc(teacherDocRef);
+
+        if (skillDocSnap.exists() && teacherDocSnap.exists()) {
+          return {
+            id: enrollDoc.id,
+            ...enrollmentData,
+            skill: { id: skillDocSnap.id, ...skillDocSnap.data() },
+            teacher: { id: teacherDocSnap.id, ...teacherDocSnap.data() }
+          };
+        }
+        return null;
+      });
+
+      const skills = (await Promise.all(skillsPromises)).filter(Boolean); // Filter out any nulls
+      setEnrolledSkills(skills);
       setLoading(false);
-    }, (err) => {
-      console.error("Error fetching courses: ", err);
+    }, (error) => {
+      console.error("Error fetching enrolled skills:", error);
       setLoading(false);
     });
 
@@ -1629,51 +1499,52 @@ function MyCoursesPage({ user, db, navigateTo }) {
   }, [user, db]);
 
   if (loading) {
-    return <p className="text-gray-500">Loading your courses...</p>;
+    return <p>Loading your courses...</p>;
+  }
+
+  if (enrolledSkills.length === 0) {
+    return (
+      <div className="bg-white p-8 rounded-lg shadow text-center">
+        <Book className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Skills Yet</h2>
+        <p className="text-lg text-gray-600 mb-6">
+          You haven't enrolled in any skills yet.
+        </p>
+        <button
+          onClick={() => navigateTo('browse')}
+          className="bg-indigo-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition"
+        >
+          Browse Skills
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-lg">
-      {myCourses.length === 0 ? (
-        <div className="text-center p-8">
-          <Library className="h-16 w-16 text-indigo-300 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">No Courses Yet</h3>
-          <p className="text-lg text-gray-600 mb-6">
-            You haven't enrolled in any skills. Start learning!
-          </p>
-          <button 
-            onClick={() => navigateTo('browse')}
-            className="bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition"
-          >
-            Browse Skills
-          </button>
+    <div className="space-y-6">
+      {enrolledSkills.map((enrollment) => (
+        <div key={enrollment.id} className="bg-white p-6 rounded-lg shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900">{enrollment.skill.skillName}</h3>
+            <p className="text-lg text-gray-600 mt-1">
+              Taught by <span className="font-medium text-indigo-600">{enrollment.teacher.name}</span>
+            </p>
+            <p className="text-gray-500 mt-2">{enrollment.skill.description}</p>
+          </div>
+          <div className="mt-4 sm:mt-0 sm:ml-6 flex-shrink-0">
+            <button
+              onClick={() => navigateTo('teacherProfile', { teacherId: enrollment.teacher.id })}
+              className="w-full bg-indigo-100 text-indigo-700 px-5 py-3 rounded-lg text-lg font-medium hover:bg-indigo-200 transition"
+            >
+              View Profile
+            </button>
+          </div>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {myCourses.map((course) => (
-            <div key={course.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
-                  <BookOpen className="h-6 w-6" />
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900">{course.skillName}</h4>
-                  <p className="text-gray-600">Taught by {course.teacherName}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => navigateTo('teacherProfile', { teacherId: course.teacherId })}
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
-              >
-                View Teacher
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      ))}
     </div>
   );
 }
+
 
 function SkillRecommendationsPage({ user, profile }) {
   return <DashboardPlaceholderPage title="Skill Recommendations" icon={Lightbulb} />;
@@ -1908,7 +1779,6 @@ function ProfileTab({ profile, user }) {
   );
 }
 
-// *** MODIFICATION 4: This is the updated ManageSkillsTab component ***
 function ManageSkillsTab({ user, profile }) {
   const [mySkills, setMySkills] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1968,7 +1838,7 @@ function ManageSkillsTab({ user, profile }) {
       // 1. Upload certificate if it exists
       if (certificate) {
         const storageRef = ref(storage, `skill_certificates/${user.uid}/${Date.now()}_${certificate.name}`);
-        await uploadBytes(storageRef, certificate);
+        await uploadBytes(storageRef, file);
         certificateURL = await getDownloadURL(storageRef);
       }
       
@@ -2096,13 +1966,13 @@ function ManageSkillsTab({ user, profile }) {
                 <p className="text-gray-600 mt-1">{skill.compensation}</p>
                 {skill.certificateURL && (
                    <a 
-                     href={skill.certificateURL} 
-                     target="_blank" 
-                     rel="noopener noreferrer" 
-                     className="text-sm text-indigo-600 hover:underline mt-1"
-                   >
-                     View Certificate
-                   </a>
+                    href={skill.certificateURL} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-sm text-indigo-600 hover:underline mt-1"
+                  >
+                    View Certificate
+                  </a>
                 )}
               </div>
             ))}
@@ -2282,7 +2152,6 @@ function MessagingTab({ user, navigateTo, initialConvo }) {
   );
 }
 
-// *** MODIFICATION 5: This is the updated FavoritesTab component ***
 function FavoritesTab({ user, profile, navigateTo, db }) {
   const [favoriteTeachers, setFavoriteTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2522,6 +2391,116 @@ function ContactUsPage() {
     </section>
   );
 }
+
+// *** MODIFICATION 6: Updated Subscription Page component ***
+function SubscriptionPage({ navigateTo }) {
+  return (
+    <section className="py-24 bg-gray-50 pt-32">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-5xl font-extrabold text-gray-900">
+            Choose Your Plan
+          </h2>
+          <p className="mt-4 text-xl text-gray-600">
+            Find the perfect plan to start learning or sharing your skills.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {/* Plan 1: Learner Plan */}
+          <SubscriptionCard
+            plan="Learner Plan"
+            price="Free"
+            per=""
+            description="Perfect for anyone looking to explore new interests and connect with local talent without any upfront cost."
+            features={[
+              "Unlimited Skill Discovery",
+              "Direct Messaging with Sharers",
+              "Session Scheduling",
+              "Community Feed Access",
+              "Basic Event Participation",
+              "Access to Free Resources"
+            ]}
+            isPopular={false}
+          />
+          
+          {/* Plan 2: Sharer Plan */}
+          <SubscriptionCard
+            plan="Sharer Plan"
+            price="₹199"
+            per="/month"
+            description="Ideal for individuals eager to share their expertise, earn income, and build their reputation within the community."
+            features={[
+              "All Learner Plan Benefits",
+              "Unlimited Skill Listing",
+              "Enhanced Profile Customization",
+              "Priority Placement in Search Results",
+              "Advanced Scheduling Tools",
+              "Analytics Dashboard for Sessions",
+              "Monetization Options for Skills"
+            ]}
+            isPopular={true}
+          />
+
+          {/* Plan 3: Community Plus */}
+          <SubscriptionCard
+            plan="Community Plus"
+            price="₹499"
+            per="/month"
+            description="Designed for proactive community leaders and organizations looking to maximize their impact and foster extensive local engagement."
+            features={[
+              "All Sharer Plan Benefits",
+              "Dedicated Community Manager Support",
+              "Premium Event Hosting Features",
+              "Promotional Boost for Events/Skills",
+              "Early Access to New Features",
+              "Exclusive Workshops & Networking",
+              "Advanced Data Insights"
+            ]}
+            isPopular={false}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// *** MODIFICATION 7: New helper component for Subscription cards ***
+function SubscriptionCard({ plan, price, per, description, features, isPopular }) {
+  return (
+    <div className={`bg-white rounded-lg shadow-lg p-8 border ${isPopular ? 'border-indigo-600' : 'border-gray-200'} relative flex flex-col`}>
+      {isPopular && (
+        <span className="absolute top-0 -translate-y-1/2 bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
+          Popular
+        </span>
+      )}
+      
+      <div className="flex-grow">
+        <h3 className="text-2xl font-bold text-gray-900">{plan}</h3>
+        <p className="text-gray-500 mt-2 h-24">{description}</p> {/* Set fixed height for description alignment */}
+        
+        <div className="my-6">
+          <span className="text-5xl font-extrabold text-gray-900">{price}</span>
+          {per && <span className="text-lg font-medium text-gray-500">{per}</span>}
+        </div>
+
+        <ul className="space-y-3 mb-8">
+          {features.map((feature, index) => (
+            <li key={index} className="flex items-start text-gray-600">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-3 flex-shrink-0 mt-1" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <button className={`w-full py-3 rounded-lg text-lg font-semibold ${isPopular ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}>
+        Get Started
+      </button>
+    </div>
+  );
+}
+
 
 function CommunityPage({ navigateTo, currentUser, isDashboard = false, db }) {
   const [posts, setPosts] = useState([]);
@@ -2913,8 +2892,8 @@ function SettingsPage({ navigateTo, currentUser, handleLogout }) {
               <p className="text-lg">
                 You are on the <span className="font-bold text-indigo-600">Free Tier</span>
               </p>
-              <button className="bg-indigo-100 text-indigo-700 px-5 py-2 rounded-lg text-lg font-medium hover:bg-indigo-200 transition">
-                Upgrade (Coming Soon)
+              <button onClick={() => navigateTo('subscription')} className="bg-indigo-100 text-indigo-700 px-5 py-2 rounded-lg text-lg font-medium hover:bg-indigo-200 transition">
+                Manage Subscription
               </button>
             </div>
           </div>
